@@ -9,8 +9,9 @@ const Notice = {
     // Admin notice stats filter state
     adminNoticeWardsCache: [],
 
-    // Confirm undeliver modal helper - returns a Promise<boolean>
-    confirmUndeliver() {
+    // Confirm modal helper - returns a Promise<boolean>
+    // Optional messageKey overrides the default "confirm_undeliver" text
+    confirmUndeliver(messageKey) {
         return new Promise((resolve) => {
             const modal = document.getElementById("modal-confirm-undeliver");
             const msgEl = document.getElementById("confirm-undeliver-msg");
@@ -20,7 +21,7 @@ const Notice = {
 
             // Apply translations
             titleEl.textContent = I18n.t("confirm");
-            msgEl.textContent = I18n.t("confirm_undeliver");
+            msgEl.textContent = I18n.t(messageKey || "confirm_undeliver");
             btnCancel.textContent = I18n.t("cancel");
             btnOk.textContent = I18n.t("confirm");
 

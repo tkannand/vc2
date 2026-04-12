@@ -1602,7 +1602,7 @@ const Scheme = {
 
         // Confirm deletion
         if (isDelete) {
-            const ok = await Notice.confirmUndeliver();
+            const ok = await Notice.confirmUndeliver("confirm_delete_family");
             if (!ok) return;
         }
 

@@ -119,6 +119,7 @@ const API = {
     getWardPendingStatus(ward, booth) { return this.get(`/api/ward/pending-status?ward=${enc(ward)}&booth=${enc(booth)}`); },
 
     // Telecaller
+    getTelecallerPendingStatus(ward) { return this.get(`/api/telecaller/pending-status?ward=${enc(ward)}`); },
     getTelecallerBooths(ward) { return this.get(`/api/telecaller/booths?ward=${enc(ward)}`); },
     getTelecallerStreets(ward, booth) {
         let url = `/api/telecaller/streets?ward=${enc(ward)}`;

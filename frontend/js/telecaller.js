@@ -52,19 +52,13 @@ const Telecaller = {
         const user = App.getUser();
         if (!user) return false;
 
-        const results = await Promise.all(
-            this.allBooths.map(b =>
-                API.getWardPendingStatus(user.ward, b.booth).then(data => ({ b, data }))
-            )
-        );
-        const found = results.find(({ data }) => data.has_pending);
-        if (!found) return false;
+        const data = await API.getTelecallerPendingStatus(user.ward);
+        if (!data.has_pending) return false;
 
-        const { b, data } = found;
         const pending = data.pending[0];
         App.showToast(I18n.t("pending_status_required") || "Please update call status before continuing");
 
-        this.currentBooth = pending.booth || b.booth;
+        this.currentBooth = pending.booth;
         document.getElementById("tc-booth-filter").value = this.currentBooth;
         this.currentTab = "not_called";
         this.setActiveTab("not_called");

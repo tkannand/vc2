@@ -487,6 +487,10 @@ TRANSLATIONS = {
         "en": "Are you sure you want to mark as not delivered?",
         "ta": "வழங்கப்படவில்லை என குறிக்க விரும்புகிறீர்களா?"
     },
+    "confirm_delete_family": {
+        "en": "Are you sure you want to delete this family?",
+        "ta": "இந்த குடும்பத்தை நீக்க விரும்புகிறீர்களா?"
+    },
     "back": {
         "en": "Back",
         "ta": "பின்"

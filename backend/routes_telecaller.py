@@ -1,6 +1,7 @@
+import asyncio
 import structlog
 from fastapi import APIRouter, Request, HTTPException
-from backend.middleware import require_role, get_client_ip
+from backend.middleware import require_role, require_booth_access, get_client_ip
 from backend import storage
 from backend.activity import log_page_view
 from backend.routes_booth import sanitize_voter
@@ -46,9 +47,11 @@ async def get_telecaller_streets(request: Request, ward: str, booth: str = ""):
     _check_ward_access(user, ward)
 
     target_booths = [booth] if booth else storage.get_booths_for_ward(ward)
+    voters_per_booth = await asyncio.gather(
+        *[asyncio.to_thread(storage.get_voters_by_booth, ward, b) for b in target_booths]
+    )
     sections_set = set()
-    for b in target_booths:
-        voters = storage.get_voters_by_booth(ward, b)
+    for voters in voters_per_booth:
         for v in voters:
             if v.get("seg_synced") == "true" and v.get("section"):
                 sections_set.add(v["section"])
@@ -77,13 +80,29 @@ async def get_telecaller_families(
     sid_list = [s.strip() for s in scheme_ids.split(",") if s.strip()]
     target_booths = [booth] if booth else storage.get_booths_for_ward(ward)
 
-    families = {}
-    for b in target_booths:
-        voters = storage.get_voters_by_booth(ward, b)
-        statuses = storage.get_all_call_statuses(ward, b)
+    # Fetch voters and call statuses for all booths in parallel
+    voters_per_booth, statuses_per_booth = await asyncio.gather(
+        asyncio.gather(*[asyncio.to_thread(storage.get_voters_by_booth, ward, b) for b in target_booths]),
+        asyncio.gather(*[asyncio.to_thread(storage.get_all_call_statuses, ward, b) for b in target_booths]),
+    )
 
-        # Fetch delivery statuses for every requested scheme
-        all_scheme_statuses = {sid: _get_scheme_statuses(ward, b, sid) for sid in sid_list}
+    # Fetch scheme statuses for all booths × schemes in parallel
+    scheme_tasks = []
+    scheme_keys = []
+    for b in target_booths:
+        for sid in sid_list:
+            scheme_tasks.append(asyncio.to_thread(_get_scheme_statuses, ward, b, sid))
+            scheme_keys.append((b, sid))
+    scheme_results = await asyncio.gather(*scheme_tasks) if scheme_tasks else []
+    scheme_map = {}
+    for (b, sid), result in zip(scheme_keys, scheme_results):
+        scheme_map.setdefault(b, {})[sid] = result
+
+    families = {}
+    for i, b in enumerate(target_booths):
+        voters = voters_per_booth[i]
+        statuses = statuses_per_booth[i]
+        all_scheme_statuses = scheme_map.get(b, {})
 
         # Telecaller only calls seg-synced voters (140K with phones/party data)
         voters = [v for v in voters if v.get("seg_synced") == "true"]
@@ -151,3 +170,39 @@ async def get_telecaller_families(
     from backend.routes_booth import mark_duplicate_phones
     mark_duplicate_phones(family_list)
     return {"families": family_list, "total": len(family_list)}
+
+
+@router.get("/pending-status")
+async def get_telecaller_pending_status(request: Request, ward: str):
+    """Check all booths in a ward for pending (in_progress) voters in one call."""
+    user = require_role(request, "telecaller", "superadmin")
+    _check_ward_access(user, ward)
+    phone = user["phone"]
+    booths = storage.get_booths_for_ward(ward)
+
+    # Query all booths for pending voters in parallel
+    pending_per_booth = await asyncio.gather(
+        *[asyncio.to_thread(storage.get_pending_voters, ward, b, phone) for b in booths]
+    )
+
+    for b, pending_list in zip(booths, pending_per_booth):
+        if not pending_list:
+            continue
+        # Found pending — look up first voter's info
+        p = pending_list[0]
+        voter_id = p.get("RowKey", "")
+        voter = storage.get_voter_by_id(ward, b, voter_id)
+        if voter:
+            return {
+                "has_pending": True,
+                "pending": [{
+                    "voter_id": voter_id,
+                    "name": voter.get("name", ""),
+                    "famcode": voter.get("famcode", voter_id),
+                    "section": voter.get("section", ""),
+                    "house": voter.get("house", ""),
+                    "booth": b,
+                }],
+            }
+
+    return {"has_pending": False, "pending": []}

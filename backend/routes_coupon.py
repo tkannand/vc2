@@ -256,48 +256,70 @@ def _get_voter_home_locations(voter_ids_set: set, members_data: list) -> dict:
 
 
 async def _evict_voters_globally(voter_ids_set: set, skip_famcode: str = "", skip_ward: str = "",
-                                 home_locations: dict = None, target_ward: str = ""):
-    """Remove voters from ANY coupon family across ALL wards and ALL booths.
-    For cross-ward voters (home ward != target_ward), adds them to __cross_claimed__
-    in their home ward so they're completely hidden from their home ward display."""
-    all_wards = storage.get_all_wards()
-    booths_per_ward = await asyncio.gather(
-        *[asyncio.to_thread(storage.get_booths_for_ward, w) for w in all_wards]
+                                 home_locations: dict = None, target_ward: str = "",
+                                 target_booth: str = ""):
+    """Remove voters from coupon families in relevant booths only.
+    Scans target booth + voter home booths instead of all wards/booths."""
+    # Collect only the specific (ward, booth) pairs we need to check
+    booth_pairs = set()
+    if target_ward and target_booth:
+        booth_pairs.add((target_ward, target_booth))
+    if home_locations:
+        for vid, (hw, hb) in home_locations.items():
+            booth_pairs.add((hw, hb))
+
+    if not booth_pairs:
+        return
+
+    pairs_list = list(booth_pairs)
+
+    # Fetch families for only the relevant booths — all in parallel
+    all_families = await asyncio.gather(
+        *[asyncio.to_thread(storage.get_coupon_families, w, b) for w, b in pairs_list]
     )
-    for ward, booths in zip(all_wards, booths_per_ward):
-        families_per_booth = await asyncio.gather(
-            *[asyncio.to_thread(storage.get_coupon_families, ward, b) for b in booths]
-        )
-        for booth, families in zip(booths, families_per_booth):
-            # Remove from ejected list — voter is joining a new family
-            storage.remove_from_ejected_coupon_voters(ward, booth, list(voter_ids_set))
-            # Remove from cross_claimed — will be re-added if still cross-ward
-            storage.remove_cross_claimed_voters(ward, booth, list(voter_ids_set))
-            for cf in families:
-                if cf["famcode"] == skip_famcode and ward == skip_ward:
-                    continue
-                updated = [v for v in cf["voter_ids"] if v not in voter_ids_set]
-                if len(updated) != len(cf["voter_ids"]):
-                    if updated:
-                        storage.update_coupon_family_members(ward, booth, cf["famcode"], updated)
-                    else:
-                        storage.delete_coupon_family(ward, booth, cf["famcode"])
+
+    # Process: remove voters from families, clean up ejection/cross-claim — all in parallel
+    cleanup_tasks = []
+    for (ward, booth), families in zip(pairs_list, all_families):
+        cleanup_tasks.append(asyncio.to_thread(
+            storage.remove_from_ejected_coupon_voters, ward, booth, list(voter_ids_set)))
+        cleanup_tasks.append(asyncio.to_thread(
+            storage.remove_cross_claimed_voters, ward, booth, list(voter_ids_set)))
+        for cf in families:
+            if cf["famcode"] == skip_famcode and ward == skip_ward:
+                continue
+            updated = [v for v in cf["voter_ids"] if v not in voter_ids_set]
+            if len(updated) != len(cf["voter_ids"]):
+                if updated:
+                    cleanup_tasks.append(asyncio.to_thread(
+                        storage.update_coupon_family_members, ward, booth, cf["famcode"], updated))
+                else:
+                    cleanup_tasks.append(asyncio.to_thread(
+                        storage.delete_coupon_family, ward, booth, cf["famcode"]))
+
+    if cleanup_tasks:
+        await asyncio.gather(*cleanup_tasks)
 
     # Cross-claim voters in their home ward so they're hidden there entirely
     if home_locations and target_ward:
+        cross_tasks = []
         for vid, (home_ward, home_booth) in home_locations.items():
             if home_ward != target_ward:
-                # Voter is from a different ward — eject AND cross-claim in home ward
-                storage.add_ejected_coupon_voters(home_ward, home_booth, [vid])
-                storage.add_cross_claimed_voters(home_ward, home_booth, [vid])
+                cross_tasks.append(asyncio.to_thread(
+                    storage.add_ejected_coupon_voters, home_ward, home_booth, [vid]))
+                cross_tasks.append(asyncio.to_thread(
+                    storage.add_cross_claimed_voters, home_ward, home_booth, [vid]))
+        if cross_tasks:
+            await asyncio.gather(*cross_tasks)
 
 
 async def _evict_voters_from_ward(ward: str, voter_ids_set: set, skip_famcode: str = "",
-                                   members_data: list = None):
-    """Evict voters globally, cross-claiming cross-ward voters in their home ward."""
+                                   members_data: list = None, target_booth: str = ""):
+    """Evict voters from relevant booths, cross-claiming cross-ward voters in their home ward."""
     home_locs = _get_voter_home_locations(voter_ids_set, members_data or [])
     await _evict_voters_globally(voter_ids_set, skip_famcode=skip_famcode, skip_ward=ward,
-                                  home_locations=home_locs, target_ward=ward)
+                                  home_locations=home_locs, target_ward=ward,
+                                  target_booth=target_booth)
 
 
 @router.post("/families")
@@ -306,8 +328,9 @@ async def create_coupon_family(request: Request, body: CouponFamilyRequest):
     if not body.voter_ids:
         raise HTTPException(status_code=400, detail="voter_ids required")
 
-    # Evict ALL voters globally — cross-ward voters get cross-claimed in their home ward
-    await _evict_voters_from_ward(body.ward, set(body.voter_ids), members_data=body.members_data)
+    # Evict voters from relevant booths only — cross-ward voters get cross-claimed in their home ward
+    await _evict_voters_from_ward(body.ward, set(body.voter_ids), members_data=body.members_data,
+                                   target_booth=body.booth)
 
     famcode = storage.create_coupon_family(body.ward, body.booth, body.voter_ids, user["phone"],
                                            members_data=body.members_data)
@@ -340,10 +363,10 @@ async def update_coupon_family(request: Request, famcode: str, body: CouponFamil
             storage.remove_cross_claimed_voters(home_ward, home_booth, [vid])
             storage.remove_from_ejected_coupon_voters(home_ward, home_booth, [vid])
 
-    # Evict newly-added voters globally (cross-ward ones get cross-claimed in home ward)
+    # Evict newly-added voters from relevant booths (cross-ward ones get cross-claimed in home ward)
     if new_ids:
         await _evict_voters_from_ward(body.ward, new_ids, skip_famcode=famcode,
-                                       members_data=body.members_data)
+                                       members_data=body.members_data, target_booth=body.booth)
 
     action = "update" if body.voter_ids else "delete"
     storage.log_coupon_action(body.ward, body.booth, action, famcode,
@@ -512,14 +535,14 @@ async def undo_coupon_action(request: Request, log_id: str, ward: str):
 
     if action == "create":
         # Undo create → delete the family
-        await _evict_voters_from_ward(ward, set(new_ids), skip_famcode="")
+        await _evict_voters_from_ward(ward, set(new_ids), skip_famcode="", target_booth=booth)
         storage.delete_coupon_family(ward, booth, famcode)
         storage.log_coupon_action(ward, booth, "undo_create", famcode, [], new_ids, user["phone"], _user_name(user))
 
     elif action == "update":
         # Undo update → restore old voter_ids
         if old_ids:
-            await _evict_voters_from_ward(ward, set(old_ids), skip_famcode=famcode)
+            await _evict_voters_from_ward(ward, set(old_ids), skip_famcode=famcode, target_booth=booth)
             storage.update_coupon_family_members(ward, booth, famcode, old_ids, created_by=user["phone"])
             storage.log_coupon_action(ward, booth, "undo_update", famcode, old_ids, new_ids, user["phone"], _user_name(user))
         else:
@@ -528,7 +551,7 @@ async def undo_coupon_action(request: Request, log_id: str, ward: str):
     elif action == "delete":
         # Undo delete → recreate family with old voter_ids
         if old_ids:
-            await _evict_voters_from_ward(ward, set(old_ids))
+            await _evict_voters_from_ward(ward, set(old_ids), target_booth=booth)
             storage.update_coupon_family_members(ward, booth, famcode, old_ids, created_by=user["phone"])
             storage.log_coupon_action(ward, booth, "undo_delete", famcode, old_ids, [], user["phone"], _user_name(user))
 
