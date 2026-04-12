@@ -1610,6 +1610,9 @@ const Scheme = {
         const submitBtn = document.getElementById("btn-coupon-builder-submit");
         if (submitBtn) App.setBtnLoading(submitBtn, true);
 
+        // Use the correct ward for each mode
+        const ward = mode === "admin" ? this.adminMode.ward : user.ward;
+
         const booth = this._modalEditBooth
             || (mode === "ward"
                 ? (this._modalPending[0]?.booth || this.wardMode.booth || "")
@@ -1628,15 +1631,15 @@ const Scheme = {
             voter_id: v.voter_id,    name: v.name || "",
             name_en:  v.name_en || v.name || "",  name_ta: v.name_ta || "",
             sl:       v.sl || "",    booth: v.booth || booth,
-            ward:     v.ward || user.ward,         section: v.section || "",
+            ward:     v.ward || ward,              section: v.section || "",
             house:    v.house || "", famcode: v.famcode || "",
             is_head:  v.is_head || "No",           age: v.age || 0,
             gender:   v.gender || "",
         }));
 
         const res = this._modalEditFamcode
-            ? await API.updateCouponFamily(user.ward, booth || user.booth, this._modalEditFamcode, voterIds, membersData)
-            : await API.createCouponFamily(user.ward, booth, voterIds, membersData);
+            ? await API.updateCouponFamily(ward, booth || user.booth, this._modalEditFamcode, voterIds, membersData)
+            : await API.createCouponFamily(ward, booth, voterIds, membersData);
 
         if (submitBtn) App.setBtnLoading(submitBtn, false);
         if (res.error) { App.showToast(res.detail || I18n.t("error")); return; }
@@ -1644,8 +1647,9 @@ const Scheme = {
         App.showToast(isDelete ? I18n.t("family_deleted") : this._modalEditFamcode ? I18n.t("family_updated") : I18n.t("family_created"));
         this._closeModal();
 
-        if (mode === "booth") await this._loadBoothData();
-        else                  await this._loadWardData();
+        if (mode === "booth")      await this._loadBoothData();
+        else if (mode === "ward")  await this._loadWardData();
+        else                       await this._loadAdminData();
     },
 
     // ── Language refresh (no API call — re-renders from cached data) ──
