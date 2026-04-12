@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic-settings
+python-jose
+cryptography
+azure-data-tables
+openpyxl
+httpx
+slowapi
+structlog
+python-multipart

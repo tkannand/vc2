@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(ls:*)",
+      "Bash(python3 -c \"import sys; line=sys.stdin.read\\(\\); print\\(repr\\(line[:500]\\)\\)\")",
+      "Bash(python3:*)",
+      "Bash(node:*)",
+      "Bash(grep -n \"routes_coupon\\\\|/api/coupon.*toggle\" \"/c/Users/ABCOM/Documents/app/connect/backend/\"*)",
+      "Bash(grep -l \"scheme\" \"/c/Users/ABCOM/Documents/app/connect/backend/\"*.py)",
+      "Bash(powershell:*)",
+      "Bash(grep:*)"
+    ]
+  }
+}

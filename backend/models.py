@@ -1,0 +1,257 @@
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional
+import re
+
+
+class OTPRequest(BaseModel):
+    phone: str = Field(..., min_length=10, max_length=10)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v):
+        if not re.match(r"^\d{10}$", v):
+            raise ValueError("Phone must be exactly 10 digits")
+        return v
+
+
+class OTPVerify(BaseModel):
+    phone: str = Field(..., min_length=10, max_length=10)
+    otp: str = Field(..., min_length=6, max_length=6)
+    language: Optional[str] = "en"
+    device_id: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v):
+        if not re.match(r"^\d{10}$", v):
+            raise ValueError("Phone must be exactly 10 digits")
+        return v
+
+    @field_validator("otp")
+    @classmethod
+    def validate_otp(cls, v):
+        if not re.match(r"^\d{6}$", v):
+            raise ValueError("OTP must be exactly 6 digits")
+        return v
+
+    @field_validator("language")
+    @classmethod
+    def validate_language(cls, v):
+        if v not in ("en", "ta"):
+            raise ValueError("Language must be 'en' or 'ta'")
+        return v
+
+
+class RoleSelectRequest(BaseModel):
+    phone: str = Field(..., min_length=10, max_length=10)
+    role: str
+    language: Optional[str] = "en"
+    device_id: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone_role(cls, v):
+        if not re.match(r"^\d{10}$", v):
+            raise ValueError("Phone must be exactly 10 digits")
+        return v
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v):
+        if v not in ("superadmin", "ward", "booth", "telecaller"):
+            raise ValueError("Role must be superadmin, ward, booth, or telecaller")
+        return v
+
+    @field_validator("language")
+    @classmethod
+    def validate_language_role(cls, v):
+        if v not in ("en", "ta"):
+            raise ValueError("Language must be 'en' or 'ta'")
+        return v
+
+
+class AddUserRequest(BaseModel):
+    phone: str = Field(..., min_length=10, max_length=10)
+    name: str = Field(..., min_length=1, max_length=100)
+    role: str
+    ward: Optional[str] = None
+    booth: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v):
+        if not re.match(r"^\d{10}$", v):
+            raise ValueError("Phone must be exactly 10 digits")
+        return v
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v):
+        if v not in ("superadmin", "ward", "booth", "telecaller"):
+            raise ValueError("Role must be superadmin, ward, booth, or telecaller")
+        return v
+
+
+class UpdateCallStatus(BaseModel):
+    status: str
+    notes: Optional[str] = Field(None, max_length=1000)
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v):
+        valid = ("called", "didnt_answer", "skipped", "not_called")
+        if v not in valid:
+            raise ValueError(f"Status must be one of: {', '.join(valid)}")
+        return v
+
+    @field_validator("notes")
+    @classmethod
+    def sanitize_notes(cls, v):
+        if v:
+            v = re.sub(r"<[^>]+>", "", v)
+            v = v.strip()
+        return v
+
+
+class ActivityLogEntry(BaseModel):
+    action: str
+    screen: Optional[str] = None
+    details: Optional[str] = None
+    duration_ms: Optional[int] = None
+    voter_id: Optional[str] = None
+
+
+class HeartbeatEntry(BaseModel):
+    screen: str
+    duration_ms: int
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+
+
+class UpdateUserSecurityRequest(BaseModel):
+    active: Optional[bool] = None
+    schedule: Optional[str] = None           # JSON string or empty string
+    geo_tracking: Optional[bool] = None
+    device_lock_enabled: Optional[bool] = None  # False = skip all device checks
+    device_pin: Optional[str] = None         # plaintext code set by admin; hashed server-side before storing
+
+
+class VerifyDevicePinRequest(BaseModel):
+    phone: str = Field(..., min_length=10, max_length=10)
+    pin: str = Field(..., min_length=4, max_length=4)      # user's login PIN (re-verified)
+    device_id: str                                          # UUID from localStorage
+    device_code: str = Field(..., min_length=4, max_length=20)  # the code admin gave them
+    language: Optional[str] = "en"
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v):
+        if not re.match(r"^\d{10}$", v):
+            raise ValueError("Phone must be exactly 10 digits")
+        return v
+
+    @field_validator("pin")
+    @classmethod
+    def validate_pin(cls, v):
+        if not re.match(r"^\d{4}$", v):
+            raise ValueError("PIN must be exactly 4 digits")
+        return v
+
+
+class CheckUserRequest(BaseModel):
+    phone: str = Field(..., min_length=10, max_length=10)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v):
+        if not re.match(r"^\d{10}$", v):
+            raise ValueError("Phone must be exactly 10 digits")
+        return v
+
+
+class PinSetupRequest(BaseModel):
+    phone: str = Field(..., min_length=10, max_length=10)
+    pin: str = Field(..., min_length=4, max_length=4)
+    pin_confirm: str = Field(..., min_length=4, max_length=4)
+    language: Optional[str] = "en"
+    device_id: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v):
+        if not re.match(r"^\d{10}$", v):
+            raise ValueError("Phone must be exactly 10 digits")
+        return v
+
+    @field_validator("pin", "pin_confirm")
+    @classmethod
+    def validate_pin(cls, v):
+        if not re.match(r"^\d{4}$", v):
+            raise ValueError("PIN must be exactly 4 digits")
+        return v
+
+
+class PinLoginRequest(BaseModel):
+    phone: str = Field(..., min_length=10, max_length=10)
+    pin: str = Field(..., min_length=4, max_length=4)
+    language: Optional[str] = "en"
+    device_id: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v):
+        if not re.match(r"^\d{10}$", v):
+            raise ValueError("Phone must be exactly 10 digits")
+        return v
+
+    @field_validator("pin")
+    @classmethod
+    def validate_pin(cls, v):
+        if not re.match(r"^\d{4}$", v):
+            raise ValueError("PIN must be exactly 4 digits")
+        return v
+
+
+class ForgotPinResetRequest(BaseModel):
+    phone: str = Field(..., min_length=10, max_length=10)
+    otp: str = Field(..., min_length=6, max_length=6)
+    new_pin: str = Field(..., min_length=4, max_length=4)
+    new_pin_confirm: str = Field(..., min_length=4, max_length=4)
+    language: Optional[str] = "en"
+    device_id: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v):
+        if not re.match(r"^\d{10}$", v):
+            raise ValueError("Phone must be exactly 10 digits")
+        return v
+
+    @field_validator("otp")
+    @classmethod
+    def validate_otp(cls, v):
+        if not re.match(r"^\d{6}$", v):
+            raise ValueError("OTP must be exactly 6 digits")
+        return v
+
+    @field_validator("new_pin", "new_pin_confirm")
+    @classmethod
+    def validate_pin(cls, v):
+        if not re.match(r"^\d{4}$", v):
+            raise ValueError("PIN must be exactly 4 digits")
+        return v
+
+
+class NoticeDeliverRequest(BaseModel):
+    voter_ids: list[str] = Field(..., min_length=1, max_length=200)
+
+    @field_validator("voter_ids")
+    @classmethod
+    def validate_voter_ids(cls, v):
+        if not v:
+            raise ValueError("At least one voter ID required")
+        return v
+
+
+class NoticeToggleRequest(BaseModel):
+    enabled: bool
