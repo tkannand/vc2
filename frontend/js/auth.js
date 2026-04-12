@@ -2,21 +2,6 @@ const Auth = {
     selectedLang: "en",
     phone: "",
     forgotPinOtp: "",
-    _pendingPin: "",   // held in memory during device code verification step
-
-    // ── Device ID ──────────────────────────────────────────────────────────────
-    // Persistent UUID stored in localStorage — identifies this browser/device.
-    // Sent with every login so the server can bind and verify the device.
-    getDeviceId() {
-        let id = localStorage.getItem("vc_device_id");
-        if (!id) {
-            id = (typeof crypto !== "undefined" && crypto.randomUUID)
-                ? crypto.randomUUID()
-                : "dev-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-            localStorage.setItem("vc_device_id", id);
-        }
-        return id;
-    },
 
     init() {
         // Language selection
@@ -85,10 +70,6 @@ const Auth = {
         this.bindPinBoxes(".reset-pin-confirm", () => this.resetPin());
         document.getElementById("btn-reset-pin").addEventListener("click", () => this.resetPin());
 
-        // Device code step
-        this.bindPinBoxes(".device-code-box", () => this.verifyDeviceCode());
-        document.getElementById("btn-verify-device-code").addEventListener("click", () => this.verifyDeviceCode());
-
         // Logout
         document.getElementById("btn-logout").addEventListener("click", () => this.logout());
 
@@ -147,7 +128,6 @@ const Auth = {
     hideAllSteps() {
         document.getElementById("login-step-phone").style.display = "none";
         document.getElementById("login-step-pin").style.display = "none";
-        document.getElementById("login-step-device-pin").style.display = "none";
         document.getElementById("login-step-setup-pin").style.display = "none";
         document.getElementById("login-step-otp").style.display = "none";
         document.getElementById("login-step-reset-pin").style.display = "none";
@@ -209,8 +189,7 @@ const Auth = {
         const btn = document.getElementById("btn-login-pin");
         App.setBtnLoading(btn, true);
 
-        this._pendingPin = pin;   // hold for device code step if needed
-        const result = await API.loginPin(this.phone, pin, this.selectedLang, this.getDeviceId());
+        const result = await API.loginPin(this.phone, pin, this.selectedLang);
         App.setBtnLoading(btn, false);
 
         if (result.error || !result.success) {
@@ -222,8 +201,6 @@ const Auth = {
                 this.showError("pin", "Account disabled. Contact your administrator.");
             } else if (result.message === "outside_allowed_hours") {
                 this.showError("pin", "Login not allowed at this time. Contact your administrator.");
-            } else if (result.message === "device_mismatch") {
-                this.showError("pin", "This device is not authorized. Contact your administrator.");
             } else if (result.message === "invalid_pin") {
                 const remaining = result.attempts_remaining;
                 const msg = remaining !== undefined
@@ -264,13 +241,11 @@ const Auth = {
         const btn = document.getElementById("btn-setup-pin");
         App.setBtnLoading(btn, true);
 
-        const result = await API.setupPin(this.phone, pin, pinConfirm, this.selectedLang, this.getDeviceId());
+        const result = await API.setupPin(this.phone, pin, pinConfirm, this.selectedLang);
         App.setBtnLoading(btn, false);
 
         if (result.error || !result.success) {
-            const msg = result.message === "device_mismatch"
-                ? "This device is not authorized. Contact your administrator."
-                : result.message === "account_disabled"
+            const msg = result.message === "account_disabled"
                 ? "Account disabled. Contact your administrator."
                 : result.message === "outside_allowed_hours"
                 ? "Login not allowed at this time. Contact your administrator."
@@ -342,7 +317,7 @@ const Auth = {
         const btn = document.getElementById("btn-reset-pin");
         App.setBtnLoading(btn, true);
 
-        const result = await API.forgotPinReset(this.phone, this.forgotPinOtp, newPin, newPinConfirm, this.selectedLang, this.getDeviceId());
+        const result = await API.forgotPinReset(this.phone, this.forgotPinOtp, newPin, newPinConfirm, this.selectedLang);
         App.setBtnLoading(btn, false);
 
         if (result.error || !result.success) {
@@ -361,15 +336,6 @@ const Auth = {
     },
 
     handleLoginSuccess(result) {
-        // Device code required — new device, admin has set a code
-        if (result.device_pin_required) {
-            this.showStep("login-step-device-pin");
-            this.clearPinBoxes(".device-code-box");
-            document.querySelector(".device-code-box").focus();
-            this.showError("device-pin", "");
-            return;
-        }
-
         // Multi-role: show role picker
         if (result.multi_role && result.roles) {
             this.showRolePicker(result.roles);
@@ -379,38 +345,6 @@ const Auth = {
         App.setUser(result.user);
         I18n.setLang(result.user.language || this.selectedLang);
         App.initForRole(result.user.role);
-    },
-
-    // Step: Device Code verification
-    async verifyDeviceCode() {
-        const code = this.getPinValue(".device-code-box");
-        if (code.length !== 4) {
-            this.showError("device-pin", "Enter the 4-digit device code");
-            return;
-        }
-
-        const btn = document.getElementById("btn-verify-device-code");
-        App.setBtnLoading(btn, true);
-
-        const result = await API.verifyDevicePin(
-            this.phone, this._pendingPin, this.getDeviceId(), code, this.selectedLang
-        );
-        App.setBtnLoading(btn, false);
-
-        if (result.error || !result.success) {
-            const msg = result.message === "invalid_device_code"
-                ? "Invalid device code. Contact your administrator."
-                : result.message === "invalid_pin"
-                ? "Session error. Please log in again."
-                : (result.detail || result.message || "Failed to authorize device.");
-            this.showError("device-pin", msg);
-            this.clearPinBoxes(".device-code-box");
-            document.querySelector(".device-code-box").focus();
-            return;
-        }
-
-        this._pendingPin = "";  // clear from memory
-        this.handleLoginSuccess(result);
     },
 
     showRolePicker(roles) {
@@ -454,7 +388,7 @@ const Auth = {
         const btns = document.querySelectorAll(".role-select-btn");
         btns.forEach((b) => (b.disabled = true));
 
-        const result = await API.selectRole(this.phone, role, this.selectedLang, this.getDeviceId());
+        const result = await API.selectRole(this.phone, role, this.selectedLang);
 
         if (result.error || !result.success) {
             const msg = result.message === "app_access_disabled"
@@ -465,17 +399,13 @@ const Auth = {
                 ? "Account disabled. Contact your administrator."
                 : result.message === "outside_allowed_hours"
                 ? "Login not allowed at this time. Contact your administrator."
-                : result.message === "device_mismatch"
-                ? "This device is not authorized. Contact your administrator."
                 : (result.detail || result.message || "Failed to select role");
             this.showError("role", msg);
             btns.forEach((b) => (b.disabled = false));
             return;
         }
 
-        App.setUser(result.user);
-        I18n.setLang(result.user.language || this.selectedLang);
-        App.initForRole(result.user.role);
+        this.handleLoginSuccess(result);
     },
 
     async logout() {
@@ -488,18 +418,15 @@ const Auth = {
     resetForm() {
         document.getElementById("input-phone").value = "";
         this.clearPinBoxes(".pin-box");
-        this.clearPinBoxes(".device-code-box");
         document.querySelectorAll(".otp-box").forEach((b) => (b.value = ""));
         this.showStep("login-step-phone");
         this.showError("phone", "");
         this.showError("pin", "");
-        this.showError("device-pin", "");
         this.showError("setup-pin", "");
         this.showError("otp", "");
         this.showError("reset-pin", "");
         this.showError("role", "");
         this.forgotPinOtp = "";
-        this._pendingPin = "";
     },
 
     showError(step, msg) {

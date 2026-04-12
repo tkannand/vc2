@@ -305,7 +305,7 @@ const Scheme = {
             scheme: null, tab: "family",
             familiesAll: [], families: [],
             ungroupedAll: [], ungrouped: [],
-            page: 0, booth: "", street: "", search: "",
+            page: 0, booth: "", street: "", search: "", otherSearch: "",
             booths: [],
         });
 
@@ -328,7 +328,7 @@ const Scheme = {
 
         Object.assign(this.wardMode, {
             scheme: schemeObj, tab: "family", page: 0,
-            booth: "", street: "", search: "",
+            booth: "", street: "", search: "", otherSearch: "",
         });
 
         content.style.display = "block";
@@ -401,7 +401,7 @@ const Scheme = {
             : arr;
 
         state.families = this._filterFams(byBooth(state.familiesAll), state.street, state.search);
-        state.ungrouped = this._filterFams(byBooth(state.ungroupedAll), state.street, state.search);
+        state.ungrouped = this._filterFams(byBooth(state.ungroupedAll), state.street, state.otherSearch);
 
         if (state.tab === "family") this._renderWardFamilies();
         else this._renderWardOther();
@@ -425,7 +425,7 @@ const Scheme = {
         if (!state.ungrouped.length) {
             html += `<div class="empty-state"><p>${I18n.t("no_ungrouped_voters")}</p></div>`;
         } else {
-            html += state.ungrouped.map(fam => this._buildOtherRow(fam.members[0], fam.famcode, state.scheme, state.search)).join("");
+            html += state.ungrouped.map(fam => this._buildOtherRow(fam.members[0], fam.famcode, state.scheme, state.otherSearch)).join("");
         }
         area.innerHTML = html;
 
@@ -446,13 +446,18 @@ const Scheme = {
 
     _bindWardFilters() {
         const c = id => this._clone(id);
-        const search = c("ward-scheme-search");
+        const search      = c("ward-scheme-search");
+        const otherSearch = c("ward-scheme-other-search");
         const booth  = c("ward-scheme-booth");
         const street = c("ward-scheme-street");
 
         if (search) search.addEventListener("input", () => {
             this.wardMode.search = search.value;
             this.wardMode.page = 0;
+            this._applyWardFilters();
+        });
+        if (otherSearch) otherSearch.addEventListener("input", () => {
+            this.wardMode.otherSearch = otherSearch.value;
             this._applyWardFilters();
         });
         if (booth) booth.addEventListener("change", () => {
@@ -571,7 +576,7 @@ const Scheme = {
     // ── Card action binding ───────────────────────────────────────
 
     _bindCardActions(area, mode) {
-        const state  = mode === "booth" ? this.boothMode : this.wardMode;
+        const state  = mode === "booth" ? this.boothMode : mode === "ward" ? this.wardMode : this.adminMode;
         const scheme = state.scheme;
         if (!scheme) return;
         const def    = this._def(scheme.id);
@@ -663,7 +668,7 @@ const Scheme = {
         const sf     = def.statusField;
         const user   = App.getUser();
         const isWard = mode !== "booth";
-        const ward   = mode === "booth" ? user.ward : state.ward;
+        const ward   = mode === "admin" ? state.ward : user.ward;
         const booth  = boothOverride || (mode === "booth" ? user.booth : state.booth);
         const idSet  = new Set(voterIds);
         const myName = user.name || "";
@@ -941,7 +946,7 @@ const Scheme = {
             ward: "", booth: "",
             familiesAll: [], families: [],
             ungroupedAll: [], ungrouped: [],
-            page: 0, search: "",
+            page: 0, search: "", otherSearch: "",
         });
 
         // Hide ward + booth rows until scheme is picked
@@ -1044,10 +1049,13 @@ const Scheme = {
 
         initMsg.style.display    = "none";
         content.style.display    = "block";
-        state.page   = 0;
-        state.search = "";
+        state.page        = 0;
+        state.search      = "";
+        state.otherSearch = "";
         const searchEl = document.getElementById("admin-scheme-search");
         if (searchEl) searchEl.value = "";
+        const otherSearchEl = document.getElementById("admin-scheme-other-search");
+        if (otherSearchEl) otherSearchEl.value = "";
         this._resetTabUI("#view-admin-scheme", "admin-scheme-family-panel", "admin-scheme-other-panel");
 
         const def = this._def(state.scheme.id);
@@ -1067,7 +1075,7 @@ const Scheme = {
     _applyAdminFilters() {
         const state = this.adminMode;
         state.families = this._filterFams(state.familiesAll, "", state.search);
-        state.ungrouped = this._filterFams(state.ungroupedAll, "", state.search);
+        state.ungrouped = this._filterFams(state.ungroupedAll, "", state.otherSearch);
         if (state.tab === "family") this._renderAdminFamilies();
         else this._renderAdminOther();
     },
@@ -1089,7 +1097,7 @@ const Scheme = {
         if (!state.ungrouped.length) {
             html += `<div class="empty-state"><p>${I18n.t("no_ungrouped_voters")}</p></div>`;
         } else {
-            html += state.ungrouped.map(fam => this._buildOtherRow(fam.members[0], fam.famcode, state.scheme, state.search)).join("");
+            html += state.ungrouped.map(fam => this._buildOtherRow(fam.members[0], fam.famcode, state.scheme, state.otherSearch)).join("");
         }
         area.innerHTML = html;
         area.querySelector(".btn-scheme-new-family")?.addEventListener("click", () => this._openModal([], null, "admin"));
@@ -1106,7 +1114,8 @@ const Scheme = {
         const schemeSel = c("admin-scheme-select");
         const wardSel   = c("admin-scheme-ward");
         const boothSel  = c("admin-scheme-booth");
-        const search    = c("admin-scheme-search");
+        const search      = c("admin-scheme-search");
+        const otherSearch = c("admin-scheme-other-search");
 
         if (schemeSel) schemeSel.addEventListener("change", () => this._onAdminSchemeChange(schemeSel.value));
         if (wardSel) wardSel.addEventListener("change", async () => {
@@ -1124,6 +1133,10 @@ const Scheme = {
         if (search) search.addEventListener("input", () => {
             this.adminMode.search = search.value;
             this.adminMode.page   = 0;
+            this._applyAdminFilters();
+        });
+        if (otherSearch) otherSearch.addEventListener("input", () => {
+            this.adminMode.otherSearch = otherSearch.value;
             this._applyAdminFilters();
         });
     },
@@ -1600,6 +1613,8 @@ const Scheme = {
         const booth = this._modalEditBooth
             || (mode === "ward"
                 ? (this._modalPending[0]?.booth || this.wardMode.booth || "")
+                : mode === "admin"
+                ? (this._modalPending[0]?.booth || this.adminMode.booth || "")
                 : user.booth);
 
         if (!booth && !isDelete) {

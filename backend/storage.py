@@ -63,7 +63,7 @@ _USER_SEC_TTL = 30  # seconds
 
 
 def get_user_security_fast(phone: str) -> dict:
-    """Return cached {active, schedule, device_id} for a user (30 s TTL)."""
+    """Return cached {active, schedule} for a user (30 s TTL)."""
     now = time.monotonic()
     if phone in _USER_SEC_CACHE:
         ts, data = _USER_SEC_CACHE[phone]
@@ -74,10 +74,9 @@ def get_user_security_fast(phone: str) -> dict:
         data = {
             "active": user.get("active", True),
             "schedule": user.get("schedule", ""),
-            "device_id": user.get("device_id", ""),
         }
     else:
-        data = {"active": True, "schedule": "", "device_id": ""}
+        data = {"active": True, "schedule": ""}
     _USER_SEC_CACHE[phone] = (now, data)
     return data
 
@@ -678,43 +677,9 @@ def delete_user(phone: str, role: str):
         pass
 
 
-def set_device_id(phone: str, device_id: str):
-    """Bind a device_id to all role entities for this phone."""
-    table = get_table(table_name("Users"))
-    for role in ["superadmin", "ward", "booth", "telecaller"]:
-        try:
-            entity = dict(table.get_entity(role, phone))
-            entity["device_id"] = device_id
-            table.upsert_entity(entity)
-        except ResourceNotFoundError:
-            continue
-    invalidate_user_security_cache(phone)
-    logger.info("device_id_set", phone=phone[-4:], bound=bool(device_id))
-
-
-def clear_device_id(phone: str):
-    set_device_id(phone, "")
-
-
-def set_device_pin_hash(phone: str, pin_hash: str):
-    """Store the hashed device code on all role entities for this phone."""
-    table = get_table(table_name("Users"))
-    for role in ["superadmin", "ward", "booth", "telecaller"]:
-        try:
-            entity = dict(table.get_entity(role, phone))
-            entity["device_pin_hash"] = pin_hash
-            table.upsert_entity(entity)
-        except ResourceNotFoundError:
-            continue
-    invalidate_user_security_cache(phone)
-    logger.info("device_pin_set", phone=phone[-4:])
-
-
 def update_user_security(phone: str, active: Optional[bool] = None,
                          schedule: Optional[str] = None,
-                         geo_tracking: Optional[bool] = None,
-                         device_pin_hash: Optional[str] = None,
-                         device_lock_enabled: Optional[bool] = None):
+                         geo_tracking: Optional[bool] = None):
     """Update security fields across all role entities for a phone number."""
     table = get_table(table_name("Users"))
     for role in ["superadmin", "ward", "booth", "telecaller"]:
@@ -728,13 +693,6 @@ def update_user_security(phone: str, active: Optional[bool] = None,
             entity["schedule"] = schedule
         if geo_tracking is not None:
             entity["geo_tracking"] = geo_tracking
-        if device_pin_hash is not None:
-            entity["device_pin_hash"] = device_pin_hash
-        if device_lock_enabled is not None:
-            entity["device_lock_enabled"] = device_lock_enabled
-            if not device_lock_enabled:
-                entity["device_id"] = ""
-                entity["device_pin_hash"] = ""
         table.upsert_entity(entity)
     invalidate_user_security_cache(phone)
     logger.info("user_security_updated", phone=phone[-4:])

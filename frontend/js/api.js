@@ -69,16 +69,13 @@ const API = {
 
     // Auth - PIN based
     checkUser(phone) { return this.post("/api/auth/check-user", { phone }); },
-    setupPin(phone, pin, pinConfirm, language, deviceId) { return this.post("/api/auth/setup-pin", { phone, pin, pin_confirm: pinConfirm, language, device_id: deviceId || "" }); },
-    loginPin(phone, pin, language, deviceId) { return this.post("/api/auth/login-pin", { phone, pin, language, device_id: deviceId || "" }); },
+    setupPin(phone, pin, pinConfirm, language) { return this.post("/api/auth/setup-pin", { phone, pin, pin_confirm: pinConfirm, language }); },
+    loginPin(phone, pin, language) { return this.post("/api/auth/login-pin", { phone, pin, language }); },
     forgotPinRequestOTP(phone) { return this.post("/api/auth/forgot-pin/request-otp", { phone }); },
-    forgotPinReset(phone, otp, newPin, newPinConfirm, language, deviceId) {
-        return this.post("/api/auth/forgot-pin/reset", { phone, otp, new_pin: newPin, new_pin_confirm: newPinConfirm, language, device_id: deviceId || "" });
+    forgotPinReset(phone, otp, newPin, newPinConfirm, language) {
+        return this.post("/api/auth/forgot-pin/reset", { phone, otp, new_pin: newPin, new_pin_confirm: newPinConfirm, language });
     },
-    selectRole(phone, role, language, deviceId) { return this.post("/api/auth/select-role", { phone, role, language, device_id: deviceId || "" }); },
-    verifyDevicePin(phone, pin, deviceId, deviceCode, language) {
-        return this.post("/api/auth/verify-device-pin", { phone, pin, device_id: deviceId || "", device_code: deviceCode, language: language || "en" });
-    },
+    selectRole(phone, role, language) { return this.post("/api/auth/select-role", { phone, role, language }); },
     logout() { return this.post("/api/auth/logout"); },
     async getMe() {
         this._skipExpiredHandler = true;
@@ -172,7 +169,6 @@ const API = {
     addUser(data) { return this.post("/api/admin/users", data); },
     updateUser(phone, data) { return this.request("PUT", `/api/admin/users/${enc(phone)}`, data); },
     removeUser(phone) { return this.del(`/api/admin/users/${enc(phone)}`); },
-    resetUserDevice(phone) { return this.post(`/api/admin/users/${enc(phone)}/reset-device`); },
     getUserLocations() { return this.get("/api/admin/user-locations"); },
     getUserActivityStats() { return this.get("/api/admin/user-activity-stats"); },
     updateUserSettings(phone, data) { return this.request("PATCH", `/api/admin/users/${enc(phone)}/settings`, data); },
@@ -244,8 +240,8 @@ const API = {
         if (booth) url += `&booth=${enc(booth)}`;
         return this.get(url);
     },
-    createCouponFamily(ward, booth, voterIds, membersData) { return this.post("/api/coupon/families", { ward, booth, voter_ids: voterIds, members_data: membersData || [] }); },
-    updateCouponFamily(ward, booth, famcode, voterIds, membersData) { return this.request("PUT", `/api/coupon/families/${enc(famcode)}`, { ward, booth, voter_ids: voterIds, members_data: membersData || [] }); },
+    createCouponFamily(ward, booth, voterIds, membersData) { return this.request("POST", "/api/coupon/families", { ward, booth, voter_ids: voterIds, members_data: membersData || [] }, 60000); },
+    updateCouponFamily(ward, booth, famcode, voterIds, membersData) { return this.request("PUT", `/api/coupon/families/${enc(famcode)}`, { ward, booth, voter_ids: voterIds, members_data: membersData || [] }, 60000); },
     deleteCouponFamily(ward, booth, famcode) { return this.del(`/api/coupon/families/${enc(famcode)}?ward=${enc(ward)}&booth=${enc(booth)}`); },
     deliverCoupon(ward, booth, voterIds) { return this.post(`/api/coupon/deliver?ward=${enc(ward)}&booth=${enc(booth)}`, { voter_ids: voterIds }); },
     undeliverCoupon(ward, booth, voterIds) { return this.post(`/api/coupon/undeliver?ward=${enc(ward)}&booth=${enc(booth)}`, { voter_ids: voterIds }); },

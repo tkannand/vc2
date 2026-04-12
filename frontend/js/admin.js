@@ -1051,13 +1051,6 @@ const Admin = {
         list.innerHTML = users.map((u) => {
             const boothLabel = u.booth ? this.formatBoothLabel(u.booth_name, u.booth_number, 30, u.booth_name_tamil) : "";
             const disabledBadge = u.active === false ? `<span class="sec-badge sec-badge-disabled">Disabled</span>` : "";
-            const deviceBadge = u.role !== "superadmin"
-                ? (u.device_lock_enabled === false
-                    ? `<span class="sec-badge sec-badge-device-free" title="Device lock disabled">Free device</span>`
-                    : u.device_bound
-                        ? `<span class="sec-badge sec-badge-device-bound" title="Device bound">Locked</span>`
-                        : `<span class="sec-badge sec-badge-device-free" title="No device bound">No device</span>`)
-                : "";
             const locationBadge = (u.last_lat && u.last_lng)
                 ? `<a class="sec-badge sec-badge-location" href="https://www.google.com/maps?q=${u.last_lat},${u.last_lng}" target="_blank" rel="noopener">📍 ${this._fmtLocationAge(u.last_location_at)}</a>`
                 : (u.geo_tracking ? `<span class="sec-badge sec-badge-geo-pending" title="Geo tracking enabled, no fix yet">📍 —</span>` : "");
@@ -1070,7 +1063,7 @@ const Admin = {
                         ${u.ward ? ` | ${u.ward}` : ""}${boothLabel ? ` | ${boothLabel}` : ""}
                         | ...${u.phone.slice(-4)}
                     </div>
-                    <div class="user-row-badges">${disabledBadge}${deviceBadge}${locationBadge}</div>
+                    <div class="user-row-badges">${disabledBadge}${locationBadge}</div>
                 </div>
                 ${u.role !== "superadmin" ? `
                 <div class="user-row-actions">
@@ -1171,29 +1164,6 @@ const Admin = {
                 // Active toggle
                 document.getElementById("user-active-toggle").checked = user.active !== false;
 
-                // Device lock status
-                const boundBadge = document.getElementById("device-lock-badge");
-                const resetBtn = document.getElementById("btn-reset-device");
-                if (user.device_bound) {
-                    boundBadge.textContent = "Device bound";
-                    boundBadge.className = "device-status-badge bound";
-                    resetBtn.style.display = "inline-flex";
-                } else {
-                    boundBadge.textContent = "No device bound";
-                    boundBadge.className = "device-status-badge unbound";
-                    resetBtn.style.display = "none";
-                }
-                // Re-bind reset button to current user
-                const newBtn = resetBtn.cloneNode(true);
-                resetBtn.parentNode.replaceChild(newBtn, resetBtn);
-                newBtn.addEventListener("click", () => this.resetDevice(user.phone));
-
-                // Device code status + input
-                const codeStatus = document.getElementById("device-code-status");
-                if (codeStatus) codeStatus.textContent = user.device_code_set ? "Code set — enter new code below to change" : "No code set";
-                const codeInput = document.getElementById("user-device-code-input");
-                if (codeInput) codeInput.value = "";
-
                 // Geo tracking
                 document.getElementById("user-geo-toggle").checked = !!user.geo_tracking;
 
@@ -1213,33 +1183,7 @@ const Admin = {
                     if (timesDiv) timesDiv.style.display = newAlways.checked ? "none" : "flex";
                 });
 
-                // Wire up device lock toggle
-                const deviceLockToggle = document.getElementById("user-device-lock-toggle");
-                const newDLToggle = deviceLockToggle.cloneNode(true);
-                deviceLockToggle.parentNode.replaceChild(newDLToggle, deviceLockToggle);
-                newDLToggle.checked = user.device_lock_enabled !== false;
-                const updateDeviceLockUI = (enabled) => {
-                    document.getElementById("user-device-lock-details").style.display = enabled ? "block" : "none";
-                    document.getElementById("user-device-lock-off-hint").style.display = enabled ? "none" : "block";
-                };
-                updateDeviceLockUI(newDLToggle.checked);
-                newDLToggle.addEventListener("change", () => updateDeviceLockUI(newDLToggle.checked));
             }
-        }
-    },
-
-    async resetDevice(phone) {
-        if (!confirm("Clear device binding? The user can then log in from any device once.")) return;
-        const btn = document.getElementById("btn-reset-device");
-        App.setBtnLoading(btn, true);
-        const result = await API.resetUserDevice(phone);
-        App.setBtnLoading(btn, false);
-        if (result.success) {
-            App.showToast("Device binding cleared");
-            const boundBadge = document.getElementById("device-lock-badge");
-            if (boundBadge) { boundBadge.textContent = "No device bound"; boundBadge.className = "device-status-badge unbound"; }
-            btn.style.display = "none";
-            this.loadUsers();
         }
     },
 
@@ -1249,21 +1193,11 @@ const Admin = {
         if (!phone) return true;
 
         const active = document.getElementById("user-active-toggle").checked;
-        const device_lock_enabled = document.getElementById("user-device-lock-toggle").checked;
         const geo_tracking = document.getElementById("user-geo-toggle").checked;
         const always = document.getElementById("user-schedule-always").checked;
         const schedule = always ? JSON.stringify({always: true}) : JSON.stringify(this._readScheduleTimes());
 
-        const deviceCodeEl = document.getElementById("user-device-code-input");
-        const device_pin = deviceCodeEl ? deviceCodeEl.value.trim() : "";
-        if (device_pin && !/^\d{4}$/.test(device_pin)) {
-            document.getElementById("add-user-error").textContent = "Device code must be exactly 4 digits";
-            return false;
-        }
-
-        const payload = {active, device_lock_enabled, geo_tracking, schedule};
-        if (device_pin) payload.device_pin = device_pin;
-        const result = await API.updateUserSettings(phone, payload);
+        const result = await API.updateUserSettings(phone, {active, geo_tracking, schedule});
         if (result.error) {
             document.getElementById("add-user-error").textContent = result.detail || "Failed to save settings";
             return false;

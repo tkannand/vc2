@@ -1866,11 +1866,20 @@ body {
 
 .modal {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: var(--nav-h);
     z-index: 200;
     display: flex;
     align-items: flex-end;
     justify-content: center;
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .modal {
+        bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+    }
 }
 
 .modal-overlay {
@@ -3172,6 +3181,22 @@ body {
 }
 
 .family-card .notice-toggle input { display: none; }
+
+/* Notice toggle pill — ungrouped voter rows (not inside family-card) */
+.ncc-other-row .notice-toggle {
+    width: auto;
+    height: auto;
+    position: static;
+    flex-shrink: 0;
+    margin-left: 0;
+}
+
+.ncc-other-row .notice-toggle input:checked + .notice-toggle-label {
+    background: var(--success-light);
+    color: var(--success);
+}
+
+.ncc-other-row .notice-toggle input { display: none; }
 
 .notice-card-actions {
     padding: 12px 0 4px;

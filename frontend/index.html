@@ -121,20 +121,6 @@
                     </div>
 
 
-                    <!-- Step 2c: Device Code (authorize new device) -->
-                    <div id="login-step-device-pin" class="auth-step" style="display:none;">
-                        <p class="auth-subtitle">Authorize this device</p>
-                        <p class="device-code-hint">Enter the device code provided by your administrator.</p>
-                        <div class="pin-inputs">
-                            <input type="tel" class="pin-box device-code-box" maxlength="1" inputmode="numeric" pattern="[0-9]*">
-                            <input type="tel" class="pin-box device-code-box" maxlength="1" inputmode="numeric" pattern="[0-9]*">
-                            <input type="tel" class="pin-box device-code-box" maxlength="1" inputmode="numeric" pattern="[0-9]*">
-                            <input type="tel" class="pin-box device-code-box" maxlength="1" inputmode="numeric" pattern="[0-9]*">
-                        </div>
-                        <button id="btn-verify-device-code" class="btn btn-primary btn-full">Authorize Device</button>
-                        <div id="login-error-device-pin" class="error-msg"></div>
-                    </div>
-
                     <!-- Step 2b: Setup PIN (first time user) -->
                     <div id="login-step-setup-pin" class="auth-step" style="display:none;">
                         <p class="auth-subtitle" data-i18n="setup_pin_msg">Create a 4-digit PIN for quick login</p>
@@ -443,30 +429,6 @@
                                     </label>
                                 </div>
 
-                                <div class="form-group">
-                                    <div class="toggle-row">
-                                        <label>Device Lock</label>
-                                        <label class="toggle-switch">
-                                            <input type="checkbox" id="user-device-lock-toggle">
-                                            <span class="toggle-slider"></span>
-                                        </label>
-                                    </div>
-                                    <div id="user-device-lock-details" style="display:none;margin-top:8px;">
-                                        <div class="device-lock-row">
-                                            <span id="device-lock-badge" class="device-status-badge unbound">No device bound</span>
-                                            <button id="btn-reset-device" class="btn btn-secondary btn-sm" style="display:none;">Reset Binding</button>
-                                        </div>
-                                        <div class="device-code-set-row" style="margin-top:6px;">
-                                            <span id="device-code-status" class="device-code-hint-text">No code set</span>
-                                        </div>
-                                        <div style="margin-top:6px;">
-                                            <label style="font-size:0.75rem;color:var(--text-muted);">Set / Change Device Code</label>
-                                            <input type="tel" id="user-device-code-input" class="input-field" maxlength="4" inputmode="numeric" placeholder="4-digit code (blank = keep current)">
-                                        </div>
-                                    </div>
-                                    <p id="user-device-lock-off-hint" style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;display:none;">Device binding disabled — user can log in from any device.</p>
-                                </div>
-
                                 <div class="form-group toggle-row">
                                     <label>Track Location</label>
                                     <label class="toggle-switch">
@@ -690,6 +652,9 @@
                         </div>
                         <!-- Other panel -->
                         <div id="ward-scheme-other-panel" style="display:none;">
+                            <div class="filter-bar">
+                                <input id="ward-scheme-other-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search…" autocomplete="off"/>
+                            </div>
                             <div id="ward-scheme-other-summary" class="notice-summary-bar"></div>
                             <div id="ward-scheme-other-area"></div>
                         </div>
@@ -761,6 +726,9 @@
                         </div>
                         <!-- Other panel -->
                         <div id="admin-scheme-other-panel" style="display:none;">
+                            <div class="filter-bar">
+                                <input id="admin-scheme-other-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search…" autocomplete="off"/>
+                            </div>
                             <div id="admin-scheme-other-summary" class="notice-summary-bar"></div>
                             <div id="admin-scheme-other-area"></div>
                         </div>

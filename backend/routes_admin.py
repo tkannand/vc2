@@ -199,9 +199,6 @@ async def get_users(request: Request):
             "language": u.get("language", "en"),
             # Security fields
             "active": bool(u.get("active", True)),
-            "device_lock_enabled": bool(u.get("device_lock_enabled", True)),
-            "device_bound": bool(u.get("device_id", "")),
-            "device_code_set": bool(u.get("device_pin_hash", "")),
             "geo_tracking": bool(u.get("geo_tracking", True)),
             "schedule": u.get("schedule", ""),
             "last_lat": u.get("last_lat"),
@@ -288,21 +285,6 @@ async def remove_user(request: Request, phone: str):
     return {"success": True, "message": "User removed"}
 
 
-@router.post("/users/{phone}/reset-device")
-async def reset_device(request: Request, phone: str):
-    """Clear the device binding for a user so they can log in from a new device."""
-    admin = require_role(request, "superadmin")
-    ip = get_client_ip(request)
-
-    target = storage.get_user(phone)
-    if not target:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    storage.clear_device_id(phone)
-    log_user_management(admin["phone"], "reset_device", phone, ip)
-    return {"success": True, "message": "Device binding cleared"}
-
-
 @router.patch("/users/{phone}/settings")
 async def update_user_settings(request: Request, phone: str, body: UpdateUserSecurityRequest):
     """Update per-user security settings: active, schedule, geo_tracking."""
@@ -315,21 +297,11 @@ async def update_user_settings(request: Request, phone: str, body: UpdateUserSec
     if target.get("PartitionKey") == "superadmin":
         raise HTTPException(status_code=400, detail="Cannot edit superadmin security settings")
 
-    # Hash the device code before storing; if set, also clear the current device binding
-    # so the user must re-bind with the new code.
-    device_pin_hash = None
-    if body.device_pin:  # non-empty string means admin is setting/changing the code
-        from backend.auth import hash_otp
-        device_pin_hash = hash_otp(body.device_pin)
-        storage.clear_device_id(phone)   # force re-bind with new code
-
     storage.update_user_security(
         phone=phone,
         active=body.active,
         schedule=body.schedule,
         geo_tracking=body.geo_tracking,
-        device_pin_hash=device_pin_hash,
-        device_lock_enabled=body.device_lock_enabled,
     )
     log_user_management(admin["phone"], "update_settings", phone, ip)
     return {"success": True, "message": "Settings updated"}

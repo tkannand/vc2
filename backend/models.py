@@ -18,7 +18,6 @@ class OTPVerify(BaseModel):
     phone: str = Field(..., min_length=10, max_length=10)
     otp: str = Field(..., min_length=6, max_length=6)
     language: Optional[str] = "en"
-    device_id: Optional[str] = None
 
     @field_validator("phone")
     @classmethod
@@ -46,7 +45,6 @@ class RoleSelectRequest(BaseModel):
     phone: str = Field(..., min_length=10, max_length=10)
     role: str
     language: Optional[str] = "en"
-    device_id: Optional[str] = None
 
     @field_validator("phone")
     @classmethod
@@ -132,30 +130,6 @@ class UpdateUserSecurityRequest(BaseModel):
     active: Optional[bool] = None
     schedule: Optional[str] = None           # JSON string or empty string
     geo_tracking: Optional[bool] = None
-    device_lock_enabled: Optional[bool] = None  # False = skip all device checks
-    device_pin: Optional[str] = None         # plaintext code set by admin; hashed server-side before storing
-
-
-class VerifyDevicePinRequest(BaseModel):
-    phone: str = Field(..., min_length=10, max_length=10)
-    pin: str = Field(..., min_length=4, max_length=4)      # user's login PIN (re-verified)
-    device_id: str                                          # UUID from localStorage
-    device_code: str = Field(..., min_length=4, max_length=20)  # the code admin gave them
-    language: Optional[str] = "en"
-
-    @field_validator("phone")
-    @classmethod
-    def validate_phone(cls, v):
-        if not re.match(r"^\d{10}$", v):
-            raise ValueError("Phone must be exactly 10 digits")
-        return v
-
-    @field_validator("pin")
-    @classmethod
-    def validate_pin(cls, v):
-        if not re.match(r"^\d{4}$", v):
-            raise ValueError("PIN must be exactly 4 digits")
-        return v
 
 
 class CheckUserRequest(BaseModel):
@@ -174,7 +148,6 @@ class PinSetupRequest(BaseModel):
     pin: str = Field(..., min_length=4, max_length=4)
     pin_confirm: str = Field(..., min_length=4, max_length=4)
     language: Optional[str] = "en"
-    device_id: Optional[str] = None
 
     @field_validator("phone")
     @classmethod
@@ -195,7 +168,6 @@ class PinLoginRequest(BaseModel):
     phone: str = Field(..., min_length=10, max_length=10)
     pin: str = Field(..., min_length=4, max_length=4)
     language: Optional[str] = "en"
-    device_id: Optional[str] = None
 
     @field_validator("phone")
     @classmethod
@@ -218,7 +190,6 @@ class ForgotPinResetRequest(BaseModel):
     new_pin: str = Field(..., min_length=4, max_length=4)
     new_pin_confirm: str = Field(..., min_length=4, max_length=4)
     language: Optional[str] = "en"
-    device_id: Optional[str] = None
 
     @field_validator("phone")
     @classmethod

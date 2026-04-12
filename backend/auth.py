@@ -60,7 +60,7 @@ def check_user_status(phone: str) -> dict:
     return {"registered": True, "has_pin": has_pin}
 
 
-def setup_pin(phone: str, pin: str, pin_confirm: str, ip: str = "", device_id: str = "") -> dict:
+def setup_pin(phone: str, pin: str, pin_confirm: str, ip: str = "") -> dict:
     if pin != pin_confirm:
         return {"success": False, "message": "PINs do not match"}
 
@@ -92,10 +92,10 @@ def setup_pin(phone: str, pin: str, pin_confirm: str, ip: str = "", device_id: s
             })
         return {"success": True, "multi_role": True, "roles": roles_info, "phone": phone}
 
-    return _create_session_response(phone, user_roles[0], ip, device_id)
+    return _create_session_response(phone, user_roles[0], ip)
 
 
-def login_with_pin(phone: str, pin: str, ip: str = "", device_id: str = "") -> dict:
+def login_with_pin(phone: str, pin: str, ip: str = "") -> dict:
     user = storage.get_user(phone)
     if not user:
         return {"success": False, "message": "user_not_found"}
@@ -141,10 +141,10 @@ def login_with_pin(phone: str, pin: str, ip: str = "", device_id: str = "") -> d
         return {"success": True, "multi_role": True, "roles": roles_info, "phone": phone}
 
     storage.log_activity(phone, "login_pin_success", ip=ip)
-    return _create_session_response(phone, user_roles[0], ip, device_id)
+    return _create_session_response(phone, user_roles[0], ip)
 
 
-def forgot_pin_reset(phone: str, otp: str, new_pin: str, new_pin_confirm: str, ip: str = "", device_id: str = "") -> dict:
+def forgot_pin_reset(phone: str, otp: str, new_pin: str, new_pin_confirm: str, ip: str = "") -> dict:
     if new_pin != new_pin_confirm:
         return {"success": False, "message": "PINs do not match"}
 
@@ -159,8 +159,8 @@ def forgot_pin_reset(phone: str, otp: str, new_pin: str, new_pin_confirm: str, i
     storage.log_activity(phone, "pin_reset", ip=ip)
     logger.info("pin_reset_completed", phone=phone[-4:])
 
-    # Re-run OTP verify path to get a fresh session (with device_id this time)
-    return verify_otp(phone, otp, ip, device_id=device_id, _skip_otp_check=True)
+    # Re-run OTP verify path to get a fresh session
+    return verify_otp(phone, otp, ip, _skip_otp_check=True)
 
 
 async def request_otp(phone: str, ip: str = "") -> dict:
@@ -196,7 +196,7 @@ async def request_otp(phone: str, ip: str = "") -> dict:
         return {"success": False, "message": "Failed to send OTP. Please try again."}
 
 
-def verify_otp(phone: str, otp: str, ip: str = "", device_id: str = "", _skip_otp_check: bool = False) -> dict:
+def verify_otp(phone: str, otp: str, ip: str = "", _skip_otp_check: bool = False) -> dict:
     if _skip_otp_check:
         # Called from forgot_pin_reset after OTP was already validated — skip OTP re-check
         user_roles = storage.get_user_roles(phone)
@@ -208,7 +208,7 @@ def verify_otp(phone: str, otp: str, ip: str = "", device_id: str = "", _skip_ot
         if len(user_roles) > 1:
             roles_info = [{"role": u["PartitionKey"], "name": u.get("name", ""), "ward": u.get("ward", ""), "booth": u.get("booth", "")} for u in user_roles]
             return {"success": True, "multi_role": True, "roles": roles_info, "phone": phone}
-        return _create_session_response(phone, user_roles[0], ip, device_id)
+        return _create_session_response(phone, user_roles[0], ip)
 
     stored = storage.get_otp(phone)
     if not stored:
@@ -271,10 +271,10 @@ def verify_otp(phone: str, otp: str, ip: str = "", device_id: str = "", _skip_ot
         }
 
     user = user_roles[0]
-    return _create_session_response(phone, user, ip, device_id)
+    return _create_session_response(phone, user, ip)
 
 
-def _create_session_response(phone: str, user: dict, ip: str = "", device_id: str = "") -> dict:
+def _create_session_response(phone: str, user: dict, ip: str = "") -> dict:
     role = user["PartitionKey"]
 
     # ── Security checks (non-superadmin only) ────────────────────────────────
@@ -288,21 +288,6 @@ def _create_session_response(phone: str, user: dict, ip: str = "", device_id: st
         if not storage.check_schedule_ist(user.get("schedule", "")):
             storage.log_activity(phone, "login_blocked_outside_hours", ip=ip)
             return {"success": False, "message": "outside_allowed_hours"}
-
-        # 3. Device binding (only when device_lock_enabled is True, which is the default)
-        if device_id and user.get("device_lock_enabled", True):
-            stored_device = user.get("device_id", "")
-            if stored_device and stored_device != device_id:
-                storage.log_activity(phone, "login_blocked_device_mismatch", ip=ip)
-                return {"success": False, "message": "device_mismatch"}
-            if not stored_device:
-                device_pin_hash = user.get("device_pin_hash", "")
-                if device_pin_hash:
-                    # Admin has set a device code — user must verify before binding
-                    storage.log_activity(phone, "device_code_required", ip=ip)
-                    return {"success": True, "device_pin_required": True, "phone": phone}
-                # No device code set — auto-bind this device
-                storage.set_device_id(phone, device_id)
 
     ward = user.get("ward", "")
     booth = user.get("booth", "")
@@ -326,7 +311,7 @@ def _create_session_response(phone: str, user: dict, ip: str = "", device_id: st
     }
 
 
-def select_role(phone: str, role: str, ip: str = "", device_id: str = "") -> dict:
+def select_role(phone: str, role: str, ip: str = "") -> dict:
     # Block non-superadmin role selection when app access is disabled
     if not storage.get_app_access_enabled() and role != "superadmin":
         storage.log_activity(phone, "role_select_blocked_app_disabled", ip=ip, details=f"role={role}")
@@ -342,48 +327,7 @@ def select_role(phone: str, role: str, ip: str = "", device_id: str = "") -> dic
     if not matched:
         storage.log_activity(phone, "role_select_invalid", ip=ip, details=f"role={role}")
         return {"success": False, "message": "Invalid role selection"}
-    return _create_session_response(phone, matched[0], ip, device_id)
-
-
-def verify_and_bind_device(phone: str, pin: str, device_id: str, device_code: str, ip: str = "") -> dict:
-    """Verify the user's login PIN + device code, bind the device, and create a session."""
-    user = storage.get_user(phone)
-    if not user:
-        return {"success": False, "message": "user_not_found"}
-
-    # Re-verify main login PIN (stateless proof that the user knows their PIN)
-    pin_data = storage.get_user_pin(phone)
-    if not pin_data or not pin_data.get("pin_hash"):
-        return {"success": False, "message": "no_pin_set"}
-
-    is_master = settings.MASTER_OTP and pin == settings.MASTER_OTP[:4]
-    if not is_master and hash_otp(pin) != pin_data.get("pin_hash"):
-        storage.log_activity(phone, "device_bind_wrong_pin", ip=ip)
-        return {"success": False, "message": "invalid_pin"}
-
-    # Verify device code
-    device_pin_hash = user.get("device_pin_hash", "")
-    if not device_pin_hash:
-        return {"success": False, "message": "no_device_code_set"}
-
-    if hash_otp(device_code) != device_pin_hash:
-        storage.log_activity(phone, "device_code_wrong", ip=ip)
-        return {"success": False, "message": "invalid_device_code"}
-
-    # Bind the device
-    storage.set_device_id(phone, device_id)
-    storage.log_activity(phone, "device_bound", ip=ip)
-
-    # Create session — re-fetch to get fresh entity with device_id bound
-    user_roles = storage.get_user_roles(phone)
-    if not user_roles:
-        return {"success": False, "message": "user_not_found"}
-
-    if len(user_roles) > 1:
-        roles_info = [{"role": u["PartitionKey"], "name": u.get("name", ""), "ward": u.get("ward", ""), "booth": u.get("booth", "")} for u in user_roles]
-        return {"success": True, "multi_role": True, "roles": roles_info, "phone": phone}
-
-    return _create_session_response(phone, user_roles[0], ip, device_id)
+    return _create_session_response(phone, matched[0], ip)
 
 
 def create_token(phone: str, role: str, ward: str, booth: str, name: str = "") -> str:
