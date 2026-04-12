@@ -156,6 +156,7 @@ const Scheme = {
     // ── Booth: init ───────────────────────────────────────────────
 
     async initBooth() {
+        App.showViewLoading("view-booth-scheme");
         const res = await API.getSchemes();
         this.schemes = res.schemes || [];
 
@@ -177,6 +178,7 @@ const Scheme = {
             if (sel) sel.value = this.schemes[0].id;
             await this._onBoothSchemeChange(this.schemes[0].id);
         }
+        App.hideViewLoading("view-booth-scheme");
     },
 
     async _onBoothSchemeChange(schemeId) {
@@ -297,6 +299,7 @@ const Scheme = {
     // ── Ward: init ────────────────────────────────────────────────
 
     async initWard() {
+        App.showViewLoading("view-ward-scheme");
         const res = await API.getSchemes();
         this.schemes = res.schemes || [];
 
@@ -317,6 +320,7 @@ const Scheme = {
             if (sel) sel.value = this.schemes[0].id;
             await this._onWardSchemeChange(this.schemes[0].id);
         }
+        App.hideViewLoading("view-ward-scheme");
     },
 
     async _onWardSchemeChange(schemeId) {
@@ -620,6 +624,21 @@ const Scheme = {
                     }
                     cb.disabled = true;
                     await this._toggle(mode, [vid], action, memberBooth);
+                });
+            });
+
+            // Other tab — individual deliver button (same look as family deliver)
+            area.querySelectorAll(".scheme-other-individual-deliver").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const vid         = btn.dataset.voterId;
+                    const memberBooth = btn.dataset.booth || null;
+                    const isDelivered = btn.classList.contains("btn-success");
+                    if (isDelivered) {
+                        const ok = await Notice.confirmUndeliver();
+                        if (!ok) return;
+                    }
+                    btn.disabled = true;
+                    await this._toggle(mode, [vid], isDelivered ? "undeliver" : "deliver", memberBooth);
                 });
             });
 
@@ -937,8 +956,11 @@ const Scheme = {
     // ── Admin: init ───────────────────────────────────────────────
 
     async initAdmin() {
+        if (!App.getUser()) return;
+        App.showViewLoading("view-admin-scheme");
         const res = await API.getSchemes();
         this.schemes = res.schemes || [];
+        console.log("[scheme-admin] schemes loaded:", this.schemes.length);
 
         const state = this.adminMode;
         Object.assign(state, {
@@ -968,17 +990,22 @@ const Scheme = {
             if (sel) { sel.value = this.schemes[0].id; }
             await this._onAdminSchemeChange(this.schemes[0].id);
         }
+
+        App.hideViewLoading("view-admin-scheme");
     },
 
     async _onAdminSchemeChange(schemeId) {
+        console.log("[scheme-admin] _onAdminSchemeChange called, schemeId:", schemeId);
         const state = this.adminMode;
         state.scheme = this.schemes.find(s => s.id === schemeId) || null;
+        console.log("[scheme-admin] scheme found:", state.scheme ? state.scheme.name : "null");
         state.ward   = "";
         state.booth  = "";
         state.familiesAll  = [];
         state.ungroupedAll = [];
 
         if (!state.scheme) {
+            console.log("[scheme-admin] no scheme selected, hiding content");
             document.getElementById("admin-scheme-ward-row").style.display  = "none";
             document.getElementById("admin-scheme-booth-row").style.display = "none";
             document.getElementById("admin-scheme-content").style.display   = "none";
@@ -987,21 +1014,27 @@ const Scheme = {
         }
 
         // Show ward row, load wards, auto-select first
+        console.log("[scheme-admin] showing ward row, calling _loadAdminWards");
         document.getElementById("admin-scheme-ward-row").style.display = "block";
         await this._loadAdminWards();
     },
 
     async _loadAdminWards() {
+        console.log("[scheme-admin] _loadAdminWards called");
         const wardSel = document.getElementById("admin-scheme-ward");
+        console.log("[scheme-admin] wardSel element:", wardSel ? "found" : "NULL");
         wardSel.innerHTML = `<option value="">${I18n.t("select_ward")}</option>`;
 
         // Use notice admin stats — returns wards with names, works for all schemes
         App.showViewLoading("view-admin-scheme");
+        console.log("[scheme-admin] calling API.getNoticeAdminStats");
         const res = await API.getNoticeAdminStats("", "");
         App.hideViewLoading("view-admin-scheme");
-        if (res.error) return;
+        console.log("[scheme-admin] API response:", res.error ? "ERROR: " + res.detail : "OK");
+        if (res.error) { console.log("[scheme-admin] aborting due to API error"); return; }
 
         const wards = res.wards || [];
+        console.log("[scheme-admin] wards received:", wards.length, wards.map(w => w.ward));
         wards.forEach(w => {
             const o = document.createElement("option");
             o.value = w.ward; o.textContent = w.ward_name || w.ward; wardSel.appendChild(o);
@@ -1009,11 +1042,16 @@ const Scheme = {
 
         // Auto-select first ward and load data
         if (wards.length > 0) {
+            console.log("[scheme-admin] auto-selecting first ward:", wards[0].ward);
             wardSel.value         = wards[0].ward;
             this.adminMode.ward   = wards[0].ward;
             this.adminMode.booth  = "";
             await this._loadAdminBooths(wards[0].ward);
+            console.log("[scheme-admin] booths loaded, now loading data");
             await this._loadAdminData();
+            console.log("[scheme-admin] data loaded successfully");
+        } else {
+            console.log("[scheme-admin] no wards found - nothing to display");
         }
     },
 
@@ -1443,13 +1481,9 @@ const Scheme = {
             data-famcode="${this._esc(famcode)}" title="${I18n.t("add_to_family")}" style="padding:4px 8px;white-space:nowrap;">${I18n.t("add_to_family")}</button>`;
 
         if (scheme.type === "individual") {
-            html += `<label class="notice-toggle">
-                <input type="checkbox" class="scheme-member-toggle"
-                    data-voter-id="${m.voter_id}" data-famcode="${this._esc(famcode)}"
-                    data-booth="${this._esc(m.booth || "")}"
-                    ${isDelivered ? "checked" : ""}>
-                <span class="notice-toggle-label">${isDelivered ? "✓ Done" : "● Pending"}</span>
-            </label>`;
+            html += `<button class="btn ${isDelivered ? "btn-success" : "btn-primary"} btn-sm scheme-other-individual-deliver"
+                data-voter-id="${m.voter_id}" data-famcode="${this._esc(famcode)}"
+                data-booth="${this._esc(m.booth || "")}">${isDelivered ? "✓ " + I18n.t("done_label") : I18n.t("deliver")}</button>`;
         } else {
             html += `<button class="btn ${isDelivered ? "btn-success" : "btn-primary"} btn-sm scheme-deliver-family"
                 data-famcode="${this._esc(famcode)}">${isDelivered ? "✓" : I18n.t("deliver")}</button>`;

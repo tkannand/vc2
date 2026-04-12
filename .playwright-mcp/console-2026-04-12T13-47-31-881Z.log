@@ -1,0 +1,10 @@
+[    2174ms] [LOG] [App] start @ http://127.0.0.1:8000/js/app.js:38
+[    2175ms] [LOG] [App] i18n init... @ http://127.0.0.1:8000/js/app.js:40
+[    2184ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://127.0.0.1:8000/:0
+[    2188ms] [LOG] [App] i18n done @ http://127.0.0.1:8000/js/app.js:42
+[    2189ms] [LOG] [App] NoticeQueue init... @ http://127.0.0.1:8000/js/app.js:45
+[    2190ms] [LOG] [App] NoticeQueue done @ http://127.0.0.1:8000/js/app.js:48
+[    2190ms] [LOG] [App] getMe... @ http://127.0.0.1:8000/js/app.js:51
+[    2198ms] [LOG] [App] getMe done false @ http://127.0.0.1:8000/js/app.js:53
+[    2199ms] [LOG] [App] showAuthFlow @ http://127.0.0.1:8000/js/app.js:61
+[    2200ms] [LOG] [App] hideLoading done @ http://127.0.0.1:8000/js/app.js:66

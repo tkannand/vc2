@@ -91,9 +91,9 @@ const Admin = {
         });
 
         // Top filter bar
-        document.getElementById("admin-filter-ward").addEventListener("change", () => this._onFilterWardChange());
-        document.getElementById("admin-filter-booth").addEventListener("change", () => this._onFilterBoothChange());
-        document.getElementById("btn-dash-clear").addEventListener("click", () => this._clearFilters());
+        document.getElementById("admin-filter-ward")?.addEventListener("change", () => this._onFilterWardChange());
+        document.getElementById("admin-filter-booth")?.addEventListener("change", () => this._onFilterBoothChange());
+        document.getElementById("btn-dash-clear")?.addEventListener("click", () => this._clearFilters());
 
         // Users / Stats page tabs
         document.querySelectorAll(".user-page-tab").forEach((btn) => {

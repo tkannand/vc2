@@ -1,7 +1,7 @@
 const API = {
     _skipExpiredHandler: false,
 
-    async request(method, url, body = null, timeoutMs = 10000) {
+    async request(method, url, body = null, timeoutMs = 60000) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
         const opts = {

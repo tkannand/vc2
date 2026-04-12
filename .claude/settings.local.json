@@ -10,7 +10,8 @@
       "Bash(grep -n \"routes_coupon\\\\|/api/coupon.*toggle\" \"/c/Users/ABCOM/Documents/app/connect/backend/\"*)",
       "Bash(grep -l \"scheme\" \"/c/Users/ABCOM/Documents/app/connect/backend/\"*.py)",
       "Bash(powershell:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(curl -s http://127.0.0.1:8000/api/auth/me)"
     ]
   }
 }
