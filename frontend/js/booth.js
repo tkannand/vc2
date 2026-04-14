@@ -4,12 +4,14 @@ const Booth = {
     currentTab: "not_called",
     currentStreet: "",
     calledVoterIds: new Set(),
+    _cachedStats: null,
 
     async init() {
         this.calledVoterIds.clear();
         this.bindTabs("view-booth-voters");
         this.bindStreetFilter();
         this.bindFamilyNav();
+        this.bindHomeStreetFilter();
         App.showViewLoading("view-booth-home");
         await Promise.all([this.loadStreets(), this.loadStats()]);
         App.hideViewLoading("view-booth-home");
@@ -458,6 +460,15 @@ const Booth = {
         }
     },
 
+    bindHomeStreetFilter() {
+        const sel = document.getElementById("booth-home-street-filter");
+        if (sel) {
+            sel.addEventListener("change", () => {
+                this.renderStatsForStreet(sel.value);
+            });
+        }
+    },
+
     async loadStats() {
         App.showViewLoading("view-booth-home");
         const user = App.getUser();
@@ -465,6 +476,25 @@ const Booth = {
         App.hideViewLoading("view-booth-home");
         if (data.error) return;
 
+        this._cachedStats = data;
+
+        // Populate home street filter
+        const sel = document.getElementById("booth-home-street-filter");
+        if (sel) {
+            sel.innerHTML = `<option value="">${I18n.t("all_streets")}</option>`;
+            (data.sections || []).forEach((s) => {
+                const opt = document.createElement("option");
+                opt.value = s.section;
+                opt.textContent = s.section;
+                sel.appendChild(opt);
+            });
+        }
+
+        this.renderStatCards(data);
+        this.renderStreetList(data.sections || []);
+    },
+
+    renderStatCards(data) {
         const cards = document.getElementById("booth-stats-cards");
         cards.innerHTML = `
             <div class="stat-card accent">
@@ -480,7 +510,7 @@ const Booth = {
                 <div class="stat-label">${I18n.t("not_called")}</div>
             </div>
             <div class="stat-card danger">
-                <div class="stat-value">${data.didnt_answer + data.skipped}</div>
+                <div class="stat-value">${data.other != null ? data.other : (data.didnt_answer || 0) + (data.skipped || 0)}</div>
                 <div class="stat-label">${I18n.t("didnt_answer_skipped")}</div>
             </div>
             <div class="stat-card wide">
@@ -488,9 +518,11 @@ const Booth = {
                 <div class="progress-bar-container"><div class="progress-bar" style="width:${data.completion_pct}%"></div></div>
             </div>
         `;
+    },
 
+    renderStreetList(sections) {
         const streetList = document.getElementById("booth-street-stats");
-        streetList.innerHTML = (data.sections || []).map((s) => `
+        streetList.innerHTML = sections.map((s) => `
             <div class="street-stat-row">
                 <div class="stat-row-top">
                     <span class="stat-row-name">${this.escHtml(s.section)}</span>
@@ -504,6 +536,28 @@ const Booth = {
                 </div>
             </div>
         `).join("");
+    },
+
+    renderStatsForStreet(street) {
+        if (!this._cachedStats) return;
+        if (!street) {
+            // Show overall stats
+            this.renderStatCards(this._cachedStats);
+            this.renderStreetList(this._cachedStats.sections || []);
+            return;
+        }
+        // Filter to selected street
+        const sec = (this._cachedStats.sections || []).find((s) => s.section === street);
+        if (!sec) return;
+        const pct = sec.total > 0 ? Math.round(sec.called / sec.total * 100 * 10) / 10 : 0;
+        this.renderStatCards({
+            total: sec.total,
+            called: sec.called,
+            not_called: sec.not_called,
+            other: sec.other || 0,
+            completion_pct: pct,
+        });
+        this.renderStreetList([sec]);
     },
 
     escHtml(str) {

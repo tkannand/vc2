@@ -173,14 +173,29 @@ async def api_me(request: Request):
     if not db_user:
         return {"authenticated": False}
 
+    ward = user.get("ward", "")
+    booth = user.get("booth", "")
+    booth_name = ""
+    booth_number = ""
+    booth_name_tamil = ""
+    if ward and booth:
+        bi_map = storage.get_booth_info_map(ward)
+        info = bi_map.get(booth, {})
+        booth_name = info.get("booth_name", "")
+        booth_number = info.get("booth_number", "")
+        booth_name_tamil = info.get("booth_name_tamil", "")
+
     return {
         "authenticated": True,
         "user": {
             "phone": user.get("phone", ""),
             "name": db_user.get("name", ""),
             "role": user.get("role", ""),
-            "ward": user.get("ward", ""),
-            "booth": user.get("booth", ""),
+            "ward": ward,
+            "booth": booth,
+            "booth_name": booth_name,
+            "booth_number": booth_number,
+            "booth_name_tamil": booth_name_tamil,
             "language": db_user.get("language", "en"),
             "geo_tracking": bool(db_user.get("geo_tracking", True)),
         },

@@ -4,6 +4,7 @@ const Ward = {
     drillStreet: "",
     drillFamilies: [],
     drillFamilyIndex: 0,
+    _cachedHomeData: null,
 
     formatBoothLabel(boothName, boothNumber, maxLen, boothNameTamil) {
         const isTamil = I18n.currentLang === "ta";
@@ -23,6 +24,16 @@ const Ward = {
         this.bindDrillTabs();
         this.bindDrillStreetFilter();
         this.bindDrillFamilyNav();
+        this.bindHomeBoothFilter();
+    },
+
+    bindHomeBoothFilter() {
+        const sel = document.getElementById("ward-home-booth-filter");
+        if (sel) {
+            sel.addEventListener("change", () => {
+                this.renderStatsForBooth(sel.value);
+            });
+        }
     },
 
     hasPendingInCurrentDrillFamily() {
@@ -71,7 +82,21 @@ const Ward = {
         App.hideViewLoading("view-ward-home");
         if (data.error) return;
 
+        this._cachedHomeData = data;
         this.renderStatCards("ward-stats-cards", data);
+
+        // Populate booth filter dropdown
+        const sel = document.getElementById("ward-home-booth-filter");
+        if (sel) {
+            sel.innerHTML = `<option value="">${I18n.t("all_booths") || "All Booths"}</option>`;
+            (data.booths || []).forEach((b) => {
+                const opt = document.createElement("option");
+                opt.value = b.booth;
+                const label = this.formatBoothLabel(b.booth_name, b.booth_number, 30, b.booth_name_tamil);
+                opt.textContent = label || b.booth;
+                sel.appendChild(opt);
+            });
+        }
 
         // Booth buttons grid
         const grid = document.getElementById("ward-booth-buttons");
@@ -88,6 +113,25 @@ const Ward = {
             btn.addEventListener("click", () => {
                 this.enterDrill(btn.dataset.booth, btn.dataset.boothNumber, btn.dataset.boothName, btn.dataset.boothNameTamil);
             });
+        });
+    },
+
+    renderStatsForBooth(boothId) {
+        if (!this._cachedHomeData) return;
+        if (!boothId) {
+            // Show overall ward stats
+            this.renderStatCards("ward-stats-cards", this._cachedHomeData);
+            return;
+        }
+        const booth = (this._cachedHomeData.booths || []).find((b) => b.booth === boothId);
+        if (!booth) return;
+        this.renderStatCards("ward-stats-cards", {
+            total: booth.total,
+            called: booth.called,
+            not_called: booth.not_called,
+            didnt_answer: booth.didnt_answer || 0,
+            skipped: booth.skipped || 0,
+            completion_pct: booth.completion_pct,
         });
     },
 

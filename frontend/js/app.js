@@ -163,6 +163,26 @@ const App = {
         badge.textContent = roleLabels[this.user.role] || this.user.role;
         badge.className = `role-badge ${this.user.role}`;
         this.updateLangButton();
+        this.updateScopeLabels();
+    },
+
+    updateScopeLabels() {
+        if (!this.user) return;
+        const isTamil = I18n.currentLang === "ta";
+        const boothName = (isTamil && this.user.booth_name_tamil) ? this.user.booth_name_tamil : (this.user.booth_name || "");
+        const boothNum = this.user.booth_number || "";
+        const boothLabel = boothNum ? `#${boothNum} ${boothName}`.trim() : boothName;
+        const ward = this.user.ward || "";
+
+        const boothScope = document.getElementById("booth-scope-label");
+        if (boothScope && ward) {
+            boothScope.textContent = boothLabel ? `${ward} - ${boothLabel}` : ward;
+        }
+
+        const wardScope = document.getElementById("ward-scope-label");
+        if (wardScope && ward) {
+            wardScope.textContent = ward;
+        }
     },
 
     updateLangButton() {
