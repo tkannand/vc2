@@ -83,8 +83,6 @@ const App = {
         document.getElementById("app-header").style.display = "none";
         document.getElementById("user-bar").style.display = "none";
         document.getElementById("bottom-nav").style.display = "none";
-        const fontBtn = document.getElementById("btn-font-size-toggle");
-        if (fontBtn) fontBtn.style.display = "none";
         // Remove top padding when no header
         document.getElementById("main-content").style.paddingTop = "0";
         document.getElementById("main-content").style.paddingBottom = "0";
@@ -94,8 +92,6 @@ const App = {
         document.getElementById("app-header").style.display = "flex";
         document.getElementById("user-bar").style.display = "flex";
         document.getElementById("bottom-nav").style.display = "flex";
-        const fontBtn = document.getElementById("btn-font-size-toggle");
-        if (fontBtn) fontBtn.style.display = "flex";
         document.getElementById("main-content").style.paddingTop = "";
         document.getElementById("main-content").style.paddingBottom = "";
         document.body.classList.remove("single-page-role");
