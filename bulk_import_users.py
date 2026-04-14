@@ -1,28 +1,24 @@
 """
-One-time script to bulk import booth workers from 'app access.xlsx' into Azure Table Storage.
+Script to import/update booth workers from 'Userphone.xlsx' into Azure Table Storage.
 
 Usage:
     python bulk_import_users.py
 
 - Reads all rows from the Excel file
-- Strips +91 prefix from phone numbers
-- Adds each user as role 'booth' with their ward and booth
-- Skips the duplicate phone (8056762435)
+- New phone numbers are added as role 'booth'
+- Existing phone numbers get their ward and booth updated
 - Prints a summary at the end
 """
 
 import os
 import sys
-from collections import Counter
 
 import openpyxl
 
 # Add project root to path so we can import backend modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from backend.storage import upsert_user
-
-SKIP_PHONES = {"8056762435"}  # duplicate phone - skip both rows
+from backend.storage import upsert_user, get_user
 
 
 def clean_phone(raw_phone: str) -> str:
@@ -36,7 +32,7 @@ def clean_phone(raw_phone: str) -> str:
 
 
 def main():
-    excel_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app access.xlsx")
+    excel_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Userphone.xlsx")
     if not os.path.exists(excel_path):
         print(f"ERROR: Excel file not found at {excel_path}")
         sys.exit(1)
@@ -44,16 +40,18 @@ def main():
     wb = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
     ws = wb["Sheet1"]
 
+    # Columns: A=Booth, B=Phone, C=Ward, D=Name, E=Ward, F=Booth
     rows = []
     for i, row in enumerate(ws.iter_rows(values_only=True)):
         if i == 0:
             continue  # skip header
-        name = str(row[1]).strip() if row[1] else ""
-        raw_phone = str(row[2]).strip() if row[2] else ""
-        ward = str(row[5]).strip() if row[5] else ""
-        booth = str(row[6]).strip() if row[6] else ""
+        raw_phone = str(row[1]).strip() if row[1] else ""
+        name = str(row[3]).strip() if row[3] else ""
+        ward = str(row[4]).strip() if row[4] else ""
+        booth = str(row[5]).strip() if row[5] else ""
 
         if not raw_phone or not name:
+            print(f"  SKIP row {i+1}: missing phone or name")
             continue
 
         phone = clean_phone(raw_phone)
@@ -65,25 +63,16 @@ def main():
 
     wb.close()
 
-    # Check for duplicates
-    phone_counts = Counter(r["phone"] for r in rows)
-    duplicates = {p for p, c in phone_counts.items() if c > 1}
-    skip_all = SKIP_PHONES | duplicates
-
-    print(f"Total rows parsed: {len(rows)}")
-    print(f"Phones to skip (duplicates): {skip_all if skip_all else 'none'}")
+    print(f"Total valid rows parsed: {len(rows)}")
     print()
 
     added = 0
-    skipped = 0
+    updated = 0
+    errors = 0
 
     for r in rows:
-        if r["phone"] in skip_all:
-            print(f"  SKIP: {r['name']} ({r['phone']}) - duplicate phone")
-            skipped += 1
-            continue
-
         try:
+            existing = get_user(r["phone"])
             upsert_user(
                 phone=r["phone"],
                 name=r["name"],
@@ -91,14 +80,18 @@ def main():
                 ward=r["ward"],
                 booth=r["booth"],
             )
-            added += 1
-            print(f"  ADDED: {r['name']} ({r['phone']}) -> {r['ward']}, {r['booth']}")
+            if existing:
+                updated += 1
+                print(f"  UPDATED: {r['name']} ({r['phone']}) -> {r['ward']}, {r['booth']}")
+            else:
+                added += 1
+                print(f"  ADDED:   {r['name']} ({r['phone']}) -> {r['ward']}, {r['booth']}")
         except Exception as e:
-            print(f"  ERROR: {r['name']} ({r['phone']}) - {e}")
-            skipped += 1
+            print(f"  ERROR:   {r['name']} ({r['phone']}) - {e}")
+            errors += 1
 
     print()
-    print(f"Done. Added: {added}, Skipped: {skipped}")
+    print(f"Done. Added: {added}, Updated: {updated}, Errors: {errors}")
 
 
 if __name__ == "__main__":

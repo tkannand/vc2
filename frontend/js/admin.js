@@ -1177,7 +1177,7 @@ const Admin = {
             const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
             filtered = filtered.filter((u) => u.last_login_at && new Date(u.last_login_at).getTime() < sevenDaysAgo);
         } else if (activity === "never") {
-            filtered = filtered.filter((u) => !u.login_count || u.login_count === 0);
+            filtered = filtered.filter((u) => (!u.login_count || u.login_count === 0) && !u.has_pin);
         }
 
         this.renderUserList(filtered);
@@ -1218,13 +1218,13 @@ const Admin = {
                 ? `<a class="sec-badge sec-badge-location" href="https://www.google.com/maps?q=${u.last_lat},${u.last_lng}" target="_blank" rel="noopener">${this._fmtLocationAge(u.last_location_at)}</a>`
                 : (u.geo_tracking ? `<span class="sec-badge sec-badge-geo-pending" title="Geo tracking enabled, no fix yet">--</span>` : "");
 
-            // Login info line
+            // Login info line — has_pin means user set up PIN (i.e. logged in at least once)
             const loginCount = u.login_count || 0;
             let loginLine = "";
             if (loginCount > 0) {
                 const lastAge = this._fmtLocationAge(u.last_login_at);
                 loginLine = `<div class="user-row-login"><span class="login-count">${loginCount} login${loginCount !== 1 ? "s" : ""}</span><span>Last: ${lastAge}</span></div>`;
-            } else {
+            } else if (!u.has_pin) {
                 loginLine = `<div class="user-row-login"><span class="login-never">Never logged in</span></div>`;
             }
 

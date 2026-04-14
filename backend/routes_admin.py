@@ -171,6 +171,8 @@ async def get_users(request: Request):
     log_page_view(user["phone"], "admin_users", get_client_ip(request))
 
     users = storage.get_all_users()
+    # Batch-fetch which phones have a PIN set (single query on Settings table)
+    phones_with_pin = storage.get_all_pin_phones()
     # Build booth info lookup per ward
     bi_cache = {}
     result = []
@@ -207,6 +209,7 @@ async def get_users(request: Request):
             # Login tracking
             "login_count": u.get("login_count", 0),
             "last_login_at": u.get("last_login_at", ""),
+            "has_pin": u["RowKey"] in phones_with_pin,
         })
     return {"users": result}
 

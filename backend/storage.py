@@ -1252,6 +1252,16 @@ def has_user_pin(phone: str) -> bool:
     return pin_data is not None and bool(pin_data.get("pin_hash"))
 
 
+def get_all_pin_phones() -> set:
+    """Return set of phone numbers that have a PIN set (single partition scan)."""
+    table = get_table(table_name("Settings"))
+    phones = set()
+    for entity in table.query_entities("PartitionKey eq 'pin'", select=["RowKey", "pin_hash"]):
+        if entity.get("pin_hash"):
+            phones.add(entity["RowKey"])
+    return phones
+
+
 def increment_pin_attempts(phone: str):
     table = get_table(table_name("Settings"))
     try:
