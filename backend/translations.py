@@ -900,16 +900,16 @@ TRANSLATIONS = {
         "ta": "வாக்காளர் எண்"
     },
     "search_by_sl": {
-        "en": "SL No",
-        "ta": "வரிசை எண்"
+        "en": "SL / Name",
+        "ta": "வரிசை / பெயர்"
     },
     "search_voter_id_placeholder": {
         "en": "Enter Voter ID (EPIC)…",
         "ta": "வாக்காளர் எண் உள்ளிடுக…"
     },
     "search_sl_placeholder": {
-        "en": "Enter SL number…",
-        "ta": "வரிசை எண் உள்ளிடுக…"
+        "en": "Enter SL or name…",
+        "ta": "வரிசை அல்லது பெயர் உள்ளிடுக…"
     },
     "add_member": {
         "en": "+ Add",

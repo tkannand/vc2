@@ -556,11 +556,11 @@ const Scheme = {
 
             html += `<div class="ncc-member-row ${isDelivered ? "ncc-delivered" : ""}${m._pending ? " ncc-pending-sync" : ""}">`;
             html += `<div class="ncc-member-info">`;
-            const editPersonSvg = `<svg class="scheme-edit-person" data-voter-id="${m.voter_id}" data-booth="${this._esc(m.booth || "")}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;opacity:0.4;flex-shrink:0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+            const editPersonSvg = `<svg class="scheme-edit-person" data-voter-id="${m.voter_id}" data-booth="${this._esc(m.booth || "")}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;flex-shrink:0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
 
             // Line 1: Name + data badge + head badge + age/gender + phone last4
             const hasData = !!(m.phone_last4 || m.party_support);
-            const dataBadge = hasData ? '<span class="ncc-data-badge">D</span>' : "";
+            const dataBadge = hasData ? '<span class="ncc-data-badge"><svg width="16" height="16" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#22c55e"/><path d="M6.5 11.5l3 3 6-6" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' : "";
             const ageParts = [m.age, m.gender ? m.gender[0] : ""].filter(Boolean).join(" · ");
             const phonePart = m.phone_last4 ? `<span class="ncc-name-meta">tel:${this._esc(m.phone_last4)}</span>` : "";
             html += `<span class="ncc-name">${this._hl(dispName, q)}${dataBadge}${isHead ? ` <span class="member-head-badge">👑</span>` : ""}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart} ${editPersonSvg}</span>`;
@@ -1532,11 +1532,11 @@ const Scheme = {
 
         let html = `<div class="other-search-row ncc-other-row ${isDelivered ? "ncc-delivered" : ""}">`;
         html += `<div class="ncc-member-info">`;
-        const editOtherSvg = `<svg class="scheme-edit-person" data-voter-id="${m.voter_id}" data-booth="${this._esc(m.booth || "")}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;opacity:0.4;flex-shrink:0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+        const editOtherSvg = `<svg class="scheme-edit-person" data-voter-id="${m.voter_id}" data-booth="${this._esc(m.booth || "")}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;flex-shrink:0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
 
         // Line 1: Name + data badge + age/gender + phone last4
         const hasData = !!(m.phone_last4 || m.party_support);
-        const dataBadge = hasData ? '<span class="ncc-data-badge">D</span>' : "";
+        const dataBadge = hasData ? '<span class="ncc-data-badge"><svg width="16" height="16" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#22c55e"/><path d="M6.5 11.5l3 3 6-6" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' : "";
         const ageParts = [m.age, m.gender ? m.gender[0] : ""].filter(Boolean).join(" · ");
         const phonePart = m.phone_last4 ? `<span class="ncc-name-meta">tel:${this._esc(m.phone_last4)}</span>` : "";
         html += `<span class="ncc-name">${this._hl(dispName, q)}${dataBadge}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart} ${editOtherSvg}</span>`;
@@ -1984,7 +1984,7 @@ const Scheme = {
         this._renderModalSearchResults(matches, qLow);
     },
 
-    // Search by SL — local search within already loaded data
+    // Search by SL / Name — local search, respects active booth/street filters
     _modalSearchBySl() {
         const q = (document.getElementById("coupon-builder-search")?.value || "").trim();
         const resultsEl = document.getElementById("coupon-builder-search-results");
@@ -1997,14 +1997,27 @@ const Scheme = {
         const allFams = [...(state.familiesAll || []), ...(state.ungroupedAll || [])];
 
         // Flatten all members from all families
-        const allMembers = allFams.flatMap(f => (f.members || []).map(m => ({ ...m, booth: m.booth || f.booth || "", ward: m.ward || "" })));
+        let allMembers = allFams.flatMap(f => (f.members || []).map(m => ({ ...m, booth: m.booth || f.booth || "", ward: m.ward || "" })));
 
-        // Filter by SL prefix/match
+        // Respect active filters (booth, street) from current state
+        const activeBooth  = state.booth  || "";
+        const activeStreet = state.street || "";
+        if (activeBooth)  allMembers = allMembers.filter(m => m.booth === activeBooth);
+        if (activeStreet) allMembers = allMembers.filter(m => m.section === activeStreet);
+
+        // Filter by SL or name match
         const pendingIds = new Set(this._modalPending.map(v => v.voter_id));
         const qLow = q.toLowerCase();
         const matches = allMembers
-            .filter(m => (m.sl || "").toLowerCase().includes(qLow) && !pendingIds.has(m.voter_id))
-            .slice(0, 10);
+            .filter(m => {
+                if (pendingIds.has(m.voter_id)) return false;
+                const sl     = (m.sl || "").toLowerCase();
+                const name   = (m.name || "").toLowerCase();
+                const nameEn = (m.name_en || "").toLowerCase();
+                const nameTa = (m.name_ta || "").toLowerCase();
+                return sl.includes(qLow) || name.includes(qLow) || nameEn.includes(qLow) || nameTa.includes(qLow);
+            })
+            .slice(0, 15);
 
         if (!matches.length) { resultsEl.innerHTML = `<div class="empty-state"><p>${I18n.t("no_results")}</p></div>`; return; }
         this._renderModalSearchResults(matches, qLow);

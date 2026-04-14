@@ -479,8 +479,9 @@ body {
     color: var(--text-primary);
 }
 .ncc-name {
-    font-size: 0.9rem;
-    font-weight: 700;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--accent);
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -497,11 +498,6 @@ body {
     justify-content: center;
     width: 16px;
     height: 16px;
-    font-size: 0.65rem;
-    font-weight: 700;
-    color: #fff;
-    background: var(--success);
-    border-radius: 4px;
     flex-shrink: 0;
     vertical-align: middle;
     margin-left: 2px;
