@@ -54,6 +54,7 @@ html {
     font-size: 16px;
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
 }
 
 html.font-size-large {
@@ -70,6 +71,7 @@ body {
     color: var(--text-primary);
     line-height: 1.5;
     overflow-x: hidden;
+    overscroll-behavior: none;
     min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
 }
@@ -172,7 +174,6 @@ body {
 .header-right {
     display: flex;
     align-items: center;
-    gap: 6px;
 }
 
 .header-center {
@@ -715,6 +716,7 @@ body {
     padding-bottom: calc(var(--nav-h) + 16px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
 .view {
@@ -3684,32 +3686,22 @@ mark.search-hl {
 }
 
 /* ============================================
-   Accessibility - Font Size Toggle (header)
+   Accessibility - Font Size Toggle (user bar)
    ============================================ */
 
-.btn-header-font-size {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
-    background: rgba(59, 130, 246, 0.15);
-    color: #93c5fd;
-    border: 1px solid rgba(59, 130, 246, 0.4);
+.btn-font-size {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
     border-radius: 6px;
-    font-size: 0.72rem;
-    font-weight: 700;
+    padding: 4px 7px;
     cursor: pointer;
-    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
     flex-shrink: 0;
-    margin-right: 8px;
 }
 
-.btn-header-font-size:active { opacity: 0.7; }
-
-.font-size-badge {
-    font-size: 0.65rem;
-    font-weight: 700;
-    color: #93c5fd;
-    pointer-events: none;
-}
+.btn-font-size:hover { background: rgba(255, 255, 255, 0.2); }
+.btn-font-size:active { opacity: 0.7; }
