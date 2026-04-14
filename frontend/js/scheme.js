@@ -238,12 +238,13 @@ const Scheme = {
             state.familiesAll, state.street, state.search, state.unfilledOnly
         );
         state.ungrouped = this._filterFams(
-            state.ungroupedAll, state.otherStreet, state.otherSearch, state.unfilledOnly
+            state.ungroupedAll, state.otherStreet, state.search, state.unfilledOnly
         );
 
         if (state.tab === "family") this._renderBoothFamilies();
         else this._renderBoothOther();
         this._refreshSummary("booth");
+        this._updateTabCounts("#view-booth-scheme", state);
     },
 
     _renderBoothFamilies() {
@@ -264,7 +265,7 @@ const Scheme = {
         if (!state.ungrouped.length) {
             html += `<div class="empty-state"><p>${I18n.t("no_ungrouped_voters")}</p></div>`;
         } else {
-            html += state.ungrouped.map(fam => this._buildOtherRow(fam.members[0], fam.famcode, state.scheme, state.otherSearch)).join("");
+            html += state.ungrouped.map(fam => this._buildOtherRow(fam.members[0], fam.famcode, state.scheme, state.search)).join("");
         }
         area.innerHTML = html;
 
@@ -287,16 +288,13 @@ const Scheme = {
         const c = id => this._clone(id);
         const search      = c("booth-scheme-search");
         const street      = c("booth-scheme-street");
-        const otherSearch = c("booth-scheme-other-search");
         const otherStreet = c("booth-scheme-other-street");
 
         if (search)      search.addEventListener("input",  () => { this.boothMode.search      = search.value;      this.boothMode.page = 0; this._applyBoothFilters(); });
         if (street)      street.addEventListener("change", () => { this.boothMode.street      = street.value;      this.boothMode.page = 0; this._applyBoothFilters(); });
-        if (otherSearch) otherSearch.addEventListener("input",  () => { this.boothMode.otherSearch = otherSearch.value; this._applyBoothFilters(); });
         if (otherStreet) otherStreet.addEventListener("change", () => { this.boothMode.otherStreet = otherStreet.value; this._applyBoothFilters(); });
 
         this._bindUnfilledToggle("btn-booth-scheme-unfilled", this.boothMode, () => this._applyBoothFilters());
-        this._bindUnfilledToggle("btn-booth-other-unfilled", this.boothMode, () => this._applyBoothFilters());
     },
 
     _bindBoothNav() {
@@ -417,11 +415,12 @@ const Scheme = {
             : arr;
 
         state.families = this._filterFams(byBooth(state.familiesAll), state.street, state.search, state.unfilledOnly);
-        state.ungrouped = this._filterFams(byBooth(state.ungroupedAll), state.street, state.otherSearch, state.unfilledOnly);
+        state.ungrouped = this._filterFams(byBooth(state.ungroupedAll), state.street, state.search, state.unfilledOnly);
 
         if (state.tab === "family") this._renderWardFamilies();
         else this._renderWardOther();
         this._refreshSummary("ward");
+        this._updateTabCounts("#view-ward-scheme", state);
     },
 
     _renderWardFamilies() {
@@ -442,7 +441,7 @@ const Scheme = {
         if (!state.ungrouped.length) {
             html += `<div class="empty-state"><p>${I18n.t("no_ungrouped_voters")}</p></div>`;
         } else {
-            html += state.ungrouped.map(fam => this._buildOtherRow(fam.members[0], fam.famcode, state.scheme, state.otherSearch)).join("");
+            html += state.ungrouped.map(fam => this._buildOtherRow(fam.members[0], fam.famcode, state.scheme, state.search)).join("");
         }
         area.innerHTML = html;
 
@@ -463,18 +462,13 @@ const Scheme = {
 
     _bindWardFilters() {
         const c = id => this._clone(id);
-        const search      = c("ward-scheme-search");
-        const otherSearch = c("ward-scheme-other-search");
+        const search = c("ward-scheme-search");
         const booth  = c("ward-scheme-booth");
         const street = c("ward-scheme-street");
 
         if (search) search.addEventListener("input", () => {
             this.wardMode.search = search.value;
             this.wardMode.page = 0;
-            this._applyWardFilters();
-        });
-        if (otherSearch) otherSearch.addEventListener("input", () => {
-            this.wardMode.otherSearch = otherSearch.value;
             this._applyWardFilters();
         });
         if (booth) booth.addEventListener("change", () => {
@@ -491,7 +485,6 @@ const Scheme = {
         });
 
         this._bindUnfilledToggle("btn-ward-scheme-unfilled", this.wardMode, () => this._applyWardFilters());
-        this._bindUnfilledToggle("btn-ward-other-unfilled", this.wardMode, () => this._applyWardFilters());
     },
 
     _bindWardNav() {
@@ -873,6 +866,18 @@ const Scheme = {
         fillBar(`${p}-other-summary`,  [],               filteredUngrouped.flatMap(f => f.members), "", I18n.t("voters_label"));
     },
 
+    _updateTabCounts(viewSel, state) {
+        const famCount   = (state.families  || []).length;
+        const otherCount = (state.ungrouped || []).length;
+        document.querySelectorAll(`${viewSel} .tab[data-scheme-tab]`).forEach(tab => {
+            if (tab.dataset.schemeTab === "family") {
+                tab.textContent = `${I18n.t("family")} (${famCount})`;
+            } else if (tab.dataset.schemeTab === "other") {
+                tab.textContent = `${I18n.t("other")} (${otherCount})`;
+            }
+        });
+    },
+
     // ── Shared helpers ────────────────────────────────────────────
 
     _populateSchemeDropdown(selId, onChange) {
@@ -1159,11 +1164,8 @@ const Scheme = {
         content.style.display    = "block";
         state.page        = 0;
         state.search      = "";
-        state.otherSearch = "";
         const searchEl = document.getElementById("admin-scheme-search");
         if (searchEl) searchEl.value = "";
-        const otherSearchEl = document.getElementById("admin-scheme-other-search");
-        if (otherSearchEl) otherSearchEl.value = "";
         this._resetTabUI("#view-admin-scheme", "admin-scheme-family-panel", "admin-scheme-other-panel");
 
         const def = this._def(state.scheme.id);
@@ -1183,10 +1185,11 @@ const Scheme = {
     _applyAdminFilters() {
         const state = this.adminMode;
         state.families = this._filterFams(state.familiesAll, "", state.search, state.unfilledOnly);
-        state.ungrouped = this._filterFams(state.ungroupedAll, "", state.otherSearch, state.unfilledOnly);
+        state.ungrouped = this._filterFams(state.ungroupedAll, "", state.search, state.unfilledOnly);
         if (state.tab === "family") this._renderAdminFamilies();
         else this._renderAdminOther();
         this._refreshSummary("admin");
+        this._updateTabCounts("#view-admin-scheme", state);
     },
 
     _renderAdminFamilies() {
@@ -1206,7 +1209,7 @@ const Scheme = {
         if (!state.ungrouped.length) {
             html += `<div class="empty-state"><p>${I18n.t("no_ungrouped_voters")}</p></div>`;
         } else {
-            html += state.ungrouped.map(fam => this._buildOtherRow(fam.members[0], fam.famcode, state.scheme, state.otherSearch)).join("");
+            html += state.ungrouped.map(fam => this._buildOtherRow(fam.members[0], fam.famcode, state.scheme, state.search)).join("");
         }
         area.innerHTML = html;
         area.querySelector(".btn-scheme-new-family")?.addEventListener("click", () => this._openModal([], null, "admin"));
@@ -1223,8 +1226,7 @@ const Scheme = {
         const schemeSel = c("admin-scheme-select");
         const wardSel   = c("admin-scheme-ward");
         const boothSel  = c("admin-scheme-booth");
-        const search      = c("admin-scheme-search");
-        const otherSearch = c("admin-scheme-other-search");
+        const search = c("admin-scheme-search");
 
         if (schemeSel) schemeSel.addEventListener("change", () => this._onAdminSchemeChange(schemeSel.value));
         if (wardSel) wardSel.addEventListener("change", async () => {
@@ -1244,13 +1246,8 @@ const Scheme = {
             this.adminMode.page   = 0;
             this._applyAdminFilters();
         });
-        if (otherSearch) otherSearch.addEventListener("input", () => {
-            this.adminMode.otherSearch = otherSearch.value;
-            this._applyAdminFilters();
-        });
 
         this._bindUnfilledToggle("btn-admin-scheme-unfilled", this.adminMode, () => this._applyAdminFilters());
-        this._bindUnfilledToggle("btn-admin-other-unfilled", this.adminMode, () => this._applyAdminFilters());
     },
 
     _bindAdminNav() {
@@ -1840,11 +1837,14 @@ const Scheme = {
                 }
                 App.showToast(I18n.t("person_updated"));
                 modal.style.display = "none";
-                // Re-render to update D badge immediately
+                // Re-render to update D badge — preserve scroll position
+                const mc2 = document.getElementById("main-content");
+                const savedScroll2 = mc2 ? mc2.scrollTop : 0;
                 const applyFn = mode === "booth" ? () => this._applyBoothFilters()
                     : mode === "ward" ? () => this._applyWardFilters()
                     : () => this._applyAdminFilters();
                 applyFn();
+                if (mc2) mc2.scrollTop = savedScroll2;
             } else {
                 errorDiv.textContent = (res && res.detail) || I18n.t("error");
                 errorDiv.style.display = "block";
@@ -2132,9 +2132,15 @@ const Scheme = {
         App.showToast(isDelete ? I18n.t("family_deleted") : this._modalEditFamcode ? I18n.t("family_updated") : I18n.t("family_created"));
         this._closeModal();
 
+        // Preserve scroll position across data reload
+        const mc = document.getElementById("main-content");
+        const savedScroll = mc ? mc.scrollTop : 0;
+
         if (mode === "booth")      await this._loadBoothData();
         else if (mode === "ward")  await this._loadWardData();
         else                       await this._loadAdminData();
+
+        if (mc) mc.scrollTop = savedScroll;
     },
 
     // ── Language refresh (no API call — re-renders from cached data) ──
