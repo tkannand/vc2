@@ -614,6 +614,42 @@
                 </div>
             </div>
 
+            <!-- Edit Person Modal -->
+            <div id="modal-edit-person" class="modal" style="display:none;">
+                <div class="modal-overlay" id="modal-edit-person-overlay"></div>
+                <div class="modal-content" style="max-width:420px;max-height:85vh;display:flex;flex-direction:column;">
+                    <h3 data-i18n="edit_person" style="margin:0 0 12px;font-size:1.1rem;">Edit Person</h3>
+                    <!-- Read-only info -->
+                    <div id="edit-person-info" style="background:var(--bg);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px;font-size:0.8rem;color:var(--text-secondary);line-height:1.6;"></div>
+                    <!-- Phone numbers -->
+                    <div style="margin-bottom:12px;">
+                        <div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px;" data-i18n="phone_numbers">Phone Numbers</div>
+                        <div id="edit-person-phones"></div>
+                        <button class="btn btn-secondary btn-sm" id="btn-add-phone" style="margin-top:6px;font-size:0.75rem;" data-i18n="add_phone">+ Add Phone</button>
+                    </div>
+                    <!-- Party support -->
+                    <div style="margin-bottom:12px;">
+                        <div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px;" data-i18n="party_support_label">Party Support</div>
+                        <select id="edit-person-party" class="select-field" style="width:100%;margin-bottom:6px;">
+                            <option value="">-- Select Party --</option>
+                            <option value="DMK">DMK</option>
+                            <option value="ADMK+BJP">ADMK+BJP</option>
+                            <option value="NTK">NTK</option>
+                            <option value="TVK">TVK</option>
+                            <option value="Others">Others</option>
+                        </select>
+                        <input id="edit-person-party-custom" class="select-field" type="text" maxlength="100" placeholder="Enter party name" style="width:100%;display:none;" />
+                    </div>
+                    <!-- Error -->
+                    <div id="edit-person-error" style="color:var(--danger);font-size:0.75rem;margin-bottom:8px;display:none;"></div>
+                    <!-- Actions -->
+                    <div class="modal-actions" style="margin-top:auto;">
+                        <button class="btn btn-secondary" id="btn-edit-person-cancel" data-i18n="cancel">Cancel</button>
+                        <button class="btn btn-primary" id="btn-edit-person-save" data-i18n="save">Save</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Booth Worker: Coupon Stats -->
             <section id="view-booth-coupon-stats" class="view" style="display:none;">
                 <div class="view-content">

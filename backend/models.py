@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Optional, List
 import re
 
 
@@ -221,6 +221,31 @@ class NoticeDeliverRequest(BaseModel):
     def validate_voter_ids(cls, v):
         if not v:
             raise ValueError("At least one voter ID required")
+        return v
+
+
+class UpdatePersonRequest(BaseModel):
+    phones: Optional[List[str]] = Field(None, max_length=4)
+    party_support: Optional[str] = Field(None, max_length=100)
+
+    @field_validator("phones")
+    @classmethod
+    def validate_phones(cls, v):
+        if v is None:
+            return v
+        if len(v) > 4:
+            raise ValueError("Maximum 4 phone numbers allowed")
+        for phone in v:
+            if phone and not re.match(r"^\d{10}$", phone):
+                raise ValueError(f"Each phone must be exactly 10 digits, got: {phone}")
+        return v
+
+    @field_validator("party_support")
+    @classmethod
+    def sanitize_party_support(cls, v):
+        if v is not None:
+            v = re.sub(r"<[^>]+>", "", v)
+            v = v.strip()
         return v
 
 

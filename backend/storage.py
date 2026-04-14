@@ -522,6 +522,35 @@ def get_voter_by_id(ward: str, booth: str, voter_id: str) -> Optional[dict]:
         return None
 
 
+def update_voter_person_data(ward: str, booth: str, voter_id: str,
+                              phones: list = None, party_support: str = None):
+    """Update phone numbers and/or party support for a voter using MERGE mode."""
+    from azure.data.tables import UpdateMode
+    table = get_table(table_name("Voters"))
+    pk = f"{normalize_key(ward)}__{normalize_key(booth)}"
+
+    entity = {
+        "PartitionKey": pk,
+        "RowKey": voter_id,
+    }
+
+    if phones is not None:
+        phone_fields = ["phone_sr_enc", "whatsapp_enc", "phone_enc", "phone3_enc"]
+        for i, field in enumerate(phone_fields):
+            if i < len(phones) and phones[i]:
+                entity[field] = encrypt_phone(phones[i])
+            else:
+                entity[field] = ""
+
+    if party_support is not None:
+        entity["party_support"] = party_support
+
+    table.upsert_entity(entity, mode=UpdateMode.MERGE)
+    logger.info("voter_person_updated", voter_id=voter_id, ward=ward, booth=booth,
+                phones_count=len(phones) if phones else 0,
+                has_party=bool(party_support))
+
+
 def store_dashboard_cache(voter_counts: dict, wards: list, booths_per_ward: dict,
                           seg_counts: dict = None, universe: dict = None):
     """Persist ward/booth/count metadata so dashboard never scans the Voters table.

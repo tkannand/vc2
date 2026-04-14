@@ -469,22 +469,27 @@ body {
     flex: 1;
 }
 .ncc-sl {
-    font-size: 0.65rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
     font-weight: 600;
 }
 .ncc-epic {
-    font-size: 0.65rem;
+    font-size: 0.8rem;
     font-weight: 700;
     color: var(--text-primary);
 }
 .ncc-name {
-    font-size: 0.875rem;
-    font-weight: 600;
+    font-size: 0.9rem;
+    font-weight: 700;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 4px;
+}
+.ncc-name-meta {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--text-muted);
 }
 .ncc-name-done {
     text-decoration: line-through;
@@ -492,7 +497,7 @@ body {
     font-weight: 400;
 }
 .ncc-by {
-    font-size: 0.65rem;
+    font-size: 0.8rem;
     color: var(--success);
     font-weight: 600;
 }
@@ -522,7 +527,7 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 12px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--border-light);
     transition: background 0.12s;
 }
@@ -537,12 +542,12 @@ body {
 }
 
 .ncc-meta {
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
 }
 
 .ncc-delivered.ncc-member-row { background: var(--success-light); }
-.ncc-delivered .ncc-name { color: var(--text-muted); font-weight: 400; }
+.ncc-delivered .ncc-name { color: var(--text-muted); font-weight: 500; }
 
 .ncc-pending-sync.ncc-member-row { background: #fef9ec; }
 .ncc-pending-sync .ncc-check-icon,
@@ -3613,3 +3618,15 @@ mark.search-hl {
 .loc-map-link:hover { text-decoration: underline; }
 .loc-no-fix { font-size: 0.75rem; color: #ca8a04; }
 .loc-off    { font-size: 0.75rem; color: var(--text-muted); }
+
+/* ── Edit person icon ── */
+.scheme-edit-person {
+    opacity: 0.35;
+    transition: opacity 0.15s;
+}
+.scheme-edit-person:hover {
+    opacity: 1;
+}
+.edit-person-phone-row input {
+    padding: 6px 10px;
+}

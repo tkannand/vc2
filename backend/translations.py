@@ -950,6 +950,54 @@ TRANSLATIONS = {
     "in_families": {
         "en": "in families",
         "ta": "குடும்பங்களில்"
+    },
+    "edit_person": {
+        "en": "Edit Person",
+        "ta": "நபரை திருத்து"
+    },
+    "phone_numbers": {
+        "en": "Phone Numbers",
+        "ta": "தொலைபேசி எண்கள்"
+    },
+    "add_phone": {
+        "en": "+ Add Phone",
+        "ta": "+ எண் சேர்"
+    },
+    "party_support_label": {
+        "en": "Party Support",
+        "ta": "கட்சி ஆதரவு"
+    },
+    "select_party": {
+        "en": "-- Select Party --",
+        "ta": "-- கட்சியை தேர்வு செய் --"
+    },
+    "party_others": {
+        "en": "Others",
+        "ta": "மற்றவர்கள்"
+    },
+    "enter_party_name": {
+        "en": "Enter party name",
+        "ta": "கட்சி பெயரை உள்ளிடு"
+    },
+    "person_updated": {
+        "en": "Person details updated",
+        "ta": "நபர் விவரங்கள் புதுப்பிக்கப்பட்டன"
+    },
+    "no_phones": {
+        "en": "No phone numbers",
+        "ta": "தொலைபேசி எண்கள் இல்லை"
+    },
+    "max_phones": {
+        "en": "Maximum 4 phone numbers",
+        "ta": "அதிகபட்சம் 4 தொலைபேசி எண்கள்"
+    },
+    "invalid_phone": {
+        "en": "Phone must be 10 digits",
+        "ta": "தொலைபேசி எண் 10 இலக்கமாக இருக்க வேண்டும்"
+    },
+    "enter_party": {
+        "en": "Enter party name",
+        "ta": "கட்சி பெயரை உள்ளிடு"
     }
 }
 

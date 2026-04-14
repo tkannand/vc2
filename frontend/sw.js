@@ -1,4 +1,4 @@
-const CACHE_NAME = "vc-v190";
+const CACHE_NAME = "vc-v192";
 const STATIC_ASSETS = [
     "/",
     "/css/style.css",

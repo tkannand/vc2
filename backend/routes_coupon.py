@@ -36,6 +36,17 @@ async def toggle_coupon(request: Request, body: CouponToggleRequest):
     return {"success": True, "enabled": body.enabled}
 
 
+def _get_phone_last4(voter: dict) -> str:
+    """Decrypt the first available phone field and return last 4 digits."""
+    for field in ("phone_sr_enc", "phone_enc", "whatsapp_enc", "phone3_enc"):
+        enc = voter.get(field, "")
+        if enc:
+            phone = storage.decrypt_phone(enc)
+            if phone and len(phone) >= 4:
+                return phone[-4:]
+    return ""
+
+
 def sanitize_coupon_voter(voter: dict) -> dict:
     return {
         "voter_id":         voter.get("RowKey", ""),
@@ -54,6 +65,7 @@ def sanitize_coupon_voter(voter: dict) -> dict:
         "section":          voter.get("section", ""),
         "sl":               voter.get("sl", ""),
         "booth":            voter.get("booth", ""),
+        "phone_last4":      _get_phone_last4(voter),
     }
 
 

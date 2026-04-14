@@ -1,7 +1,7 @@
 import structlog
 from fastapi import APIRouter, Request
 from backend.middleware import require_booth_access, get_client_ip
-from backend.models import UpdateCallStatus
+from backend.models import UpdateCallStatus, UpdatePersonRequest
 from backend import storage
 from backend.activity import log_phone_reveal, log_call_status_change, log_page_view
 
@@ -183,6 +183,34 @@ async def reveal_phone(request: Request, voter_id: str, ward: str, booth: str):
             seen.add(dec)
 
     return {"phones": phones, "voter_id": voter_id}
+
+
+@router.post("/voter/{voter_id}/update-person")
+async def update_person(request: Request, voter_id: str, body: UpdatePersonRequest, ward: str, booth: str):
+    user = require_booth_access(request, ward, booth)
+    ip = get_client_ip(request)
+
+    voter = storage.get_voter_by_id(ward, booth, voter_id)
+    if not voter:
+        return {"error": "Voter not found"}, 404
+
+    storage.update_voter_person_data(
+        ward=ward,
+        booth=booth,
+        voter_id=voter_id,
+        phones=body.phones,
+        party_support=body.party_support,
+    )
+    storage.log_activity(
+        phone=user["phone"],
+        action="update_person",
+        screen="scheme",
+        details=f"voter={voter_id}",
+        ip=ip,
+        voter_id=voter_id,
+    )
+    logger.info("person_updated", voter_id=voter_id, by=user["phone"][-4:])
+    return {"success": True}
 
 
 @router.post("/voter/{voter_id}/status")

@@ -535,7 +535,6 @@ const Scheme = {
         members.forEach(m => {
             const isDelivered = m[sf] === "delivered";
             const isTa = I18n.currentLang === "ta";
-            // Name: seg data → Tamil name → English name → raw name (independent sources, best-effort)
             const dispName = isTa
                 ? (m.name_ta || m.name_seg || m.name_en || m.name || "")
                 : (m.name_seg || m.name_en || m.name || m.name_ta || "");
@@ -543,17 +542,24 @@ const Scheme = {
 
             html += `<div class="ncc-member-row ${isDelivered ? "ncc-delivered" : ""}${m._pending ? " ncc-pending-sync" : ""}">`;
             html += `<div class="ncc-member-info">`;
-            html += `<span class="ncc-name">${this._hl(dispName, q)}${isHead ? ` <span class="member-head-badge">👑</span>` : ""}</span>`;
-            const idParts = [];
-            if (m.sl)       idParts.push(`${I18n.t("sl_no")} ${this._hl(m.sl, q)}`);
-            if (m.voter_id) idParts.push(`${I18n.t("id_label")} <span class="ncc-epic">${this._hl(m.voter_id, q)}</span>`);
-            if (idParts.length) html += `<span class="ncc-sl">${idParts.join(" · ")}</span>`;
+            const editPersonSvg = `<svg class="scheme-edit-person" data-voter-id="${m.voter_id}" data-booth="${this._esc(m.booth || "")}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;opacity:0.4;flex-shrink:0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+
+            // Line 1: Name + head badge + age/gender + phone last4
+            const ageParts = [m.age, m.gender ? m.gender[0] : ""].filter(Boolean).join(" · ");
+            const phonePart = m.phone_last4 ? `<span class="ncc-name-meta">tel:${this._esc(m.phone_last4)}</span>` : "";
+            html += `<span class="ncc-name">${this._hl(dispName, q)}${isHead ? ` <span class="member-head-badge">👑</span>` : ""}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart} ${editPersonSvg}</span>`;
+
+            // Line 2: SL + EPIC + Relation (all merged)
+            const line2 = [];
+            if (m.sl) line2.push(`${I18n.t("sl_no")} ${this._hl(m.sl, q)}`);
+            if (m.voter_id) line2.push(`${I18n.t("id_label")} <span class="ncc-epic">${this._hl(m.voter_id, q)}</span>`);
             const relName = isTa ? (m.relation_name_ta || m.relation_name || "") : (m.relation_name || "");
             if (m.relation_type || relName) {
-                html += `<span class="ncc-meta">${this._esc([m.relation_type, relName].filter(Boolean).join(" "))}</span>`;
+                line2.push(this._esc([m.relation_type, relName].filter(Boolean).join(" ")));
             }
-            const meta = [m.age, m.gender].filter(Boolean).join(" · ");
-            if (meta) html += `<span class="ncc-meta">${this._esc(meta)}</span>`;
+            if (line2.length) html += `<span class="ncc-sl">${line2.join(" · ")}</span>`;
+
+            // Line 3: Delivered by (only if delivered)
             if (isDelivered && m._delivered_by_name) {
                 const atStr = this._fmtDeliveredAt(m._delivered_at);
                 html += `<span class="ncc-by">by ${this._esc(m._delivered_by_name)}${atStr ? ` · ${atStr}` : ""}</span>`;
@@ -599,6 +605,17 @@ const Scheme = {
                     { famcode: fam.famcode, booth: fam.booth || fam.members[0]?.booth || "" },
                     mode
                 );
+            });
+        });
+
+        // Edit person — pencil icon next to each member name
+        area.querySelectorAll(".scheme-edit-person").forEach(icon => {
+            icon.addEventListener("click", e => {
+                e.stopPropagation();
+                e.preventDefault();
+                const voterId = icon.dataset.voterId;
+                const memberBooth = icon.dataset.booth || "";
+                this._openEditPersonModal(voterId, memberBooth, mode);
             });
         });
 
@@ -1466,18 +1483,26 @@ const Scheme = {
 
         let html = `<div class="other-search-row ncc-other-row ${isDelivered ? "ncc-delivered" : ""}">`;
         html += `<div class="ncc-member-info">`;
-        html += `<span class="ncc-name">${this._hl(dispName, q)}</span>`;
-        const idPartsOther = [];
-        if (m.sl)       idPartsOther.push(`${I18n.t("sl_no")} ${this._hl(m.sl, q)}`);
-        if (m.voter_id) idPartsOther.push(`${I18n.t("id_label")} <span class="ncc-epic">${this._hl(m.voter_id, q)}</span>`);
-        if (idPartsOther.length) html += `<span class="ncc-sl">${idPartsOther.join(" · ")}</span>`;
+        const editOtherSvg = `<svg class="scheme-edit-person" data-voter-id="${m.voter_id}" data-booth="${this._esc(m.booth || "")}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;opacity:0.4;flex-shrink:0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+
+        // Line 1: Name + age/gender + phone last4
+        const ageParts = [m.age, m.gender ? m.gender[0] : ""].filter(Boolean).join(" · ");
+        const phonePart = m.phone_last4 ? `<span class="ncc-name-meta">tel:${this._esc(m.phone_last4)}</span>` : "";
+        html += `<span class="ncc-name">${this._hl(dispName, q)}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart} ${editOtherSvg}</span>`;
+
+        // Line 2: SL + EPIC + Section + Relation (all merged)
+        const line2 = [];
+        if (m.sl) line2.push(`${I18n.t("sl_no")} ${this._hl(m.sl, q)}`);
+        if (m.voter_id) line2.push(`${I18n.t("id_label")} <span class="ncc-epic">${this._hl(m.voter_id, q)}</span>`);
+        if (m.section) line2.push(this._esc(m.section));
         const relNameO = isTa ? (m.relation_name_ta || m.relation_name || "") : (m.relation_name || "");
-        if (m.relation_type || relNameO) html += `<span class="ncc-meta">${this._esc([m.relation_type, relNameO].filter(Boolean).join(" "))}</span>`;
-        const meta = [m.section, (m.age && m.gender) ? `${m.age} · ${m.gender[0]}` : ""].filter(Boolean).join(" | ");
-        if (meta) html += `<span class="ncc-meta">${this._esc(meta)}</span>`;
+        if (m.relation_type || relNameO) line2.push(this._esc([m.relation_type, relNameO].filter(Boolean).join(" ")));
+        if (line2.length) html += `<span class="ncc-sl">${line2.join(" · ")}</span>`;
+
+        // Line 3: Delivered by (only if delivered)
         if (isDelivered && m._delivered_by_name) {
             const atStr = this._fmtDeliveredAt(m._delivered_at);
-            html += `<span class="ncc-by">✓ ${this._esc(m._delivered_by_name)}${atStr ? ` · ${atStr}` : ""}</span>`;
+            html += `<span class="ncc-by">by ${this._esc(m._delivered_by_name)}${atStr ? ` · ${atStr}` : ""}</span>`;
         }
         html += `</div>`;
 
@@ -1495,6 +1520,269 @@ const Scheme = {
         }
         html += `</div></div>`;
         return html;
+    },
+
+    // ── Edit person modal ─────────────────────────────────────────
+
+    _editPersonVoterId: null,
+    _editPersonBooth: null,
+    _editPersonMode: null,
+
+    async _openEditPersonModal(voterId, booth, mode) {
+        const state = mode === "booth" ? this.boothMode : mode === "ward" ? this.wardMode : this.adminMode;
+        const user = App.getUser();
+        const ward = mode === "admin" ? state.ward : user.ward;
+        const memberBooth = booth || (mode === "booth" ? user.booth : state.booth);
+
+        // Find voter data in current state
+        let voter = null;
+        const allFams = [...(state.familiesAll || []), ...(state.ungroupedAll || [])];
+        for (const fam of allFams) {
+            for (const m of fam.members) {
+                if (m.voter_id === voterId) { voter = m; break; }
+            }
+            if (voter) break;
+        }
+        if (!voter) { App.showToast("Voter not found"); return; }
+
+        this._editPersonVoterId = voterId;
+        this._editPersonBooth = memberBooth;
+        this._editPersonMode = mode;
+
+        const modal = document.getElementById("modal-edit-person");
+        const infoDiv = document.getElementById("edit-person-info");
+        const phonesDiv = document.getElementById("edit-person-phones");
+        const partySelect = document.getElementById("edit-person-party");
+        const partyCustom = document.getElementById("edit-person-party-custom");
+        const errorDiv = document.getElementById("edit-person-error");
+
+        errorDiv.style.display = "none";
+        errorDiv.textContent = "";
+
+        // Populate read-only info
+        const isTa = I18n.currentLang === "ta";
+        const name = isTa
+            ? (voter.name_ta || voter.name_seg || voter.name_en || voter.name || "")
+            : (voter.name_seg || voter.name_en || voter.name || voter.name_ta || "");
+        const relType = voter.relation_type || voter.relationship || "";
+        const relName = isTa ? (voter.relation_name_ta || voter.relation_name || "") : (voter.relation_name || "");
+        const gender = voter.gender || "";
+        const infoLines = [
+            `<b>${this._esc(name)}</b>`,
+            `${I18n.t("voter_id")}: ${this._esc(voterId)}`,
+            relType || relName ? `${this._esc(relType)} ${this._esc(relName)}` : "",
+            gender ? `${this._esc(gender)}, ${I18n.t("age")}: ${voter.age || ""}` : "",
+        ].filter(Boolean);
+        infoDiv.innerHTML = infoLines.join("<br>");
+
+        // Fetch decrypted phones
+        phonesDiv.innerHTML = `<div style="font-size:0.75rem;color:var(--text-muted);">${I18n.t("loading")}</div>`;
+        let phones = [];
+        try {
+            const revealFn = mode === "booth" ? API.revealPhone : API.wardRevealPhone;
+            const res = await revealFn.call(API, ward, memberBooth, voterId);
+            if (res && !res.error && res.phones) {
+                phones = res.phones.map(p => p.number).filter(Boolean);
+            }
+        } catch (e) {
+            console.log("edit_person_reveal_error", e);
+        }
+
+        // Store original count for read-only logic (> 2 existing = read-only)
+        this._editPersonOriginalPhoneCount = phones.length;
+
+        // Render phone inputs
+        this._renderEditPersonPhones(phones);
+
+        // Party support
+        const partyVal = voter.party_support || "";
+        const knownParties = ["DMK", "ADMK+BJP", "NTK", "TVK"];
+        if (knownParties.includes(partyVal)) {
+            partySelect.value = partyVal;
+            partyCustom.style.display = "none";
+            partyCustom.value = "";
+        } else if (partyVal) {
+            partySelect.value = "Others";
+            partyCustom.style.display = "block";
+            partyCustom.value = partyVal;
+        } else {
+            partySelect.value = "";
+            partyCustom.style.display = "none";
+            partyCustom.value = "";
+        }
+
+        // Show modal
+        modal.style.display = "flex";
+
+        // Bind events (clone to remove old listeners)
+        this._bindEditPersonEvents();
+    },
+
+    _renderEditPersonPhones(phones) {
+        const phonesDiv = document.getElementById("edit-person-phones");
+        if (!phones || phones.length === 0) {
+            phonesDiv.innerHTML = `<div style="font-size:0.75rem;color:var(--text-muted);">${I18n.t("no_phones")}</div>`;
+            return;
+        }
+        const origCount = this._editPersonOriginalPhoneCount || 0;
+        const readOnlyMode = origCount > 2;
+        let html = "";
+        phones.forEach((phone, i) => {
+            const isExisting = readOnlyMode && i < origCount;
+            if (isExisting) {
+                // Read-only display for existing phones when > 2
+                html += `<div class="edit-person-phone-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
+                    <div class="select-field" style="flex:1;font-size:0.85rem;background:var(--bg);color:var(--text-secondary);cursor:default;">${this._esc(phone)}</div>
+                    <input type="hidden" class="edit-person-phone-input" value="${this._esc(phone)}" />
+                </div>`;
+            } else {
+                // Editable input for new phones or when <= 2 existing
+                html += `<div class="edit-person-phone-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
+                    <input type="tel" class="select-field edit-person-phone-input" value="${this._esc(phone)}" maxlength="10" pattern="[0-9]{10}" placeholder="10 digit number" style="flex:1;font-size:0.85rem;" />
+                    <button class="btn btn-secondary btn-sm edit-person-phone-remove" data-index="${i}" style="padding:4px 8px;font-size:0.7rem;color:var(--danger);">x</button>
+                </div>`;
+            }
+        });
+        phonesDiv.innerHTML = html;
+
+        // Bind remove buttons (only exist on editable rows)
+        phonesDiv.querySelectorAll(".edit-person-phone-remove").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const currentPhones = this._getEditPersonPhones();
+                currentPhones.splice(parseInt(btn.dataset.index), 1);
+                this._renderEditPersonPhones(currentPhones);
+            });
+        });
+    },
+
+    _getEditPersonPhones() {
+        const inputs = document.querySelectorAll(".edit-person-phone-input");
+        return Array.from(inputs).map(inp => inp.value.trim()).filter(Boolean);
+    },
+
+    _bindEditPersonEvents() {
+        const modal = document.getElementById("modal-edit-person");
+        const overlay = document.getElementById("modal-edit-person-overlay");
+        const cancelBtn = document.getElementById("btn-edit-person-cancel");
+        const saveBtn = document.getElementById("btn-edit-person-save");
+        const addPhoneBtn = document.getElementById("btn-add-phone");
+        const partySelect = document.getElementById("edit-person-party");
+        const partyCustom = document.getElementById("edit-person-party-custom");
+        const errorDiv = document.getElementById("edit-person-error");
+
+        const close = () => { modal.style.display = "none"; };
+
+        // Clone to remove old listeners
+        const newOverlay = overlay.cloneNode(true);
+        overlay.parentNode.replaceChild(newOverlay, overlay);
+        newOverlay.addEventListener("click", close);
+
+        const newCancel = cancelBtn.cloneNode(true);
+        cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+        newCancel.addEventListener("click", close);
+
+        // Party "Others" toggle
+        const savedPartyVal = partySelect.value;
+        const newPartySelect = partySelect.cloneNode(true);
+        partySelect.parentNode.replaceChild(newPartySelect, partySelect);
+        newPartySelect.value = savedPartyVal;
+        newPartySelect.addEventListener("change", () => {
+            const custom = document.getElementById("edit-person-party-custom");
+            if (newPartySelect.value === "Others") {
+                custom.style.display = "block";
+                custom.focus();
+            } else {
+                custom.style.display = "none";
+                custom.value = "";
+            }
+        });
+
+        // Add phone
+        const newAddPhone = addPhoneBtn.cloneNode(true);
+        addPhoneBtn.parentNode.replaceChild(newAddPhone, addPhoneBtn);
+        newAddPhone.addEventListener("click", () => {
+            const currentPhones = this._getEditPersonPhones();
+            if (currentPhones.length >= 4) {
+                errorDiv.textContent = I18n.t("max_phones");
+                errorDiv.style.display = "block";
+                return;
+            }
+            errorDiv.style.display = "none";
+            currentPhones.push("");
+            this._renderEditPersonPhones(currentPhones);
+            // Focus last input
+            const inputs = document.querySelectorAll(".edit-person-phone-input");
+            if (inputs.length) inputs[inputs.length - 1].focus();
+        });
+
+        // Save
+        const newSave = saveBtn.cloneNode(true);
+        saveBtn.parentNode.replaceChild(newSave, saveBtn);
+        newSave.addEventListener("click", async () => {
+            errorDiv.style.display = "none";
+
+            // Collect phones
+            const phones = this._getEditPersonPhones();
+            if (phones.length > 4) {
+                errorDiv.textContent = I18n.t("max_phones");
+                errorDiv.style.display = "block";
+                return;
+            }
+            for (const p of phones) {
+                if (!/^\d{10}$/.test(p)) {
+                    errorDiv.textContent = I18n.t("invalid_phone") + `: ${p}`;
+                    errorDiv.style.display = "block";
+                    return;
+                }
+            }
+
+            // Collect party support
+            const pSelect = document.getElementById("edit-person-party");
+            const pCustom = document.getElementById("edit-person-party-custom");
+            let partySupport = pSelect.value;
+            if (partySupport === "Others") {
+                partySupport = pCustom.value.trim();
+                if (!partySupport) {
+                    errorDiv.textContent = I18n.t("enter_party");
+                    errorDiv.style.display = "block";
+                    return;
+                }
+            }
+
+            // Call API
+            newSave.disabled = true;
+            newSave.textContent = "...";
+            const user = App.getUser();
+            const ward = this._editPersonMode === "admin" ? this.adminMode.ward : user.ward;
+            const booth = this._editPersonBooth;
+            const voterId = this._editPersonVoterId;
+            const mode = this._editPersonMode;
+
+            const apiFn = mode === "booth" ? API.updatePerson : API.wardUpdatePerson;
+            const res = await apiFn.call(API, ward, booth, voterId, phones, partySupport);
+
+            newSave.disabled = false;
+            newSave.textContent = I18n.t("save");
+
+            if (res && !res.error) {
+                // Update local state so party_support shows on re-render
+                const state = mode === "booth" ? this.boothMode : mode === "ward" ? this.wardMode : this.adminMode;
+                const allFams = [...(state.familiesAll || []), ...(state.ungroupedAll || [])];
+                for (const fam of allFams) {
+                    for (const m of fam.members) {
+                        if (m.voter_id === voterId) {
+                            m.party_support = partySupport;
+                            break;
+                        }
+                    }
+                }
+                App.showToast(I18n.t("person_updated"));
+                modal.style.display = "none";
+            } else {
+                errorDiv.textContent = (res && res.detail) || I18n.t("error");
+                errorDiv.style.display = "block";
+            }
+        });
     },
 
     // ── Family builder modal ──────────────────────────────────────

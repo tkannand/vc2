@@ -98,6 +98,9 @@ const API = {
     updateStatus(ward, booth, voterId, status, notes) {
         return this.post(`/api/booth/voter/${enc(voterId)}/status?ward=${enc(ward)}&booth=${enc(booth)}`, { status, notes });
     },
+    updatePerson(ward, booth, voterId, phones, partySupport) {
+        return this.post(`/api/booth/voter/${enc(voterId)}/update-person?ward=${enc(ward)}&booth=${enc(booth)}`, { phones, party_support: partySupport });
+    },
     getBoothStats(ward, booth) { return this.get(`/api/booth/stats?ward=${enc(ward)}&booth=${enc(booth)}`); },
     getBoothPendingStatus(ward, booth) { return this.get(`/api/booth/pending-status?ward=${enc(ward)}&booth=${enc(booth)}`); },
 
@@ -112,6 +115,9 @@ const API = {
     },
     wardRevealPhone(ward, booth, voterId) {
         return this.post(`/api/ward/booth-voter/${enc(voterId)}/reveal-phone?ward=${enc(ward)}&booth=${enc(booth)}`);
+    },
+    wardUpdatePerson(ward, booth, voterId, phones, partySupport) {
+        return this.post(`/api/ward/booth-voter/${enc(voterId)}/update-person?ward=${enc(ward)}&booth=${enc(booth)}`, { phones, party_support: partySupport });
     },
     wardUpdateStatus(ward, booth, voterId, status, notes) {
         return this.post(`/api/ward/booth-voter/${enc(voterId)}/status?ward=${enc(ward)}&booth=${enc(booth)}`, { status, notes });
