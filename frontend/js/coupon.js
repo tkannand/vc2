@@ -189,7 +189,8 @@ const Coupon = {
         html += `<div class="ncc-header-left">`;
         html += `<span class="ncc-house">🏠 ${Notice.escapeHtml(fam.house || "-")}</span>`;
         html += `<span class="ncc-count">(${members.length})</span>`;
-        if (fam.section) html += `<span class="ncc-section">${Notice._hl(fam.section, query)}</span>`;
+        const secDisp = (isTamil && fam.section_ta) ? fam.section_ta : fam.section;
+        if (secDisp) html += `<span class="ncc-section">${Notice._hl(secDisp, query)}</span>`;
         if (deliveredCount > 0) {
             html += `<span class="ncc-progress ${allDelivered ? "ncc-progress-full" : ""}">${deliveredCount}/${members.length} ✓</span>`;
         }

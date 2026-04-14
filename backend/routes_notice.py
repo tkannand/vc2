@@ -53,6 +53,7 @@ def sanitize_notice_voter(voter: dict) -> dict:
         "is_head":         voter.get("is_head", "No"),
         "house":           voter.get("house", ""),
         "section":         voter.get("section", ""),
+        "section_ta":      voter.get("section_name_ta", ""),
         "sl":              voter.get("sl", ""),
         "booth":           voter.get("booth", ""),
         "phone_last4":     _get_phone_last4(voter),
@@ -189,10 +190,13 @@ async def get_notice_stats(request: Request, ward: str, booth: str):
 
     # Section breakdown — derived from already-fetched voters, no extra queries
     sections_set: dict = {}
+    section_ta_map: dict = {}  # section_name -> section_name_ta
     for v in voters:
         sec = v.get("section", "")
         if sec:
             sections_set.setdefault(sec, []).append(v)
+            if sec not in section_ta_map:
+                section_ta_map[sec] = v.get("section_name_ta", "")
 
     section_stats = []
     for section in sorted(sections_set.keys()):
@@ -204,6 +208,7 @@ async def get_notice_stats(request: Request, ward: str, booth: str):
         )
         section_stats.append({
             "section": section,
+            "section_ta": section_ta_map.get(section, ""),
             "total": sec_total,
             "delivered": sec_delivered,
             "pending": sec_total - sec_delivered,

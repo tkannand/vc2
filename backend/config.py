@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     def set_default_excel_path(cls, v):
         if not v:
             base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            return os.path.join(base, "Seg_Data (1).csv")
+            return os.path.join(base, "segment.csv")
         return v
 
     @field_validator("VOTER_DATA_FILE_PATH", mode="before")
@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     def set_default_voter_data_path(cls, v):
         if not v:
             base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            return os.path.join(base, "Voter_Data.csv")
+            return os.path.join(base, "Voter.xlsx")
         return v
 
     @field_validator("ENCRYPTION_KEY", mode="before")

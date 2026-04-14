@@ -760,14 +760,34 @@ body {
 .btn-logout-inline:active { opacity: 0.7; }
 
 .scope-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--accent);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     background: var(--accent-light);
-    padding: 6px 12px;
+    border: 1px solid var(--accent);
+    border-left: 4px solid var(--accent);
     border-radius: var(--radius-sm);
+    padding: 10px 14px;
     margin-bottom: 12px;
-    display: inline-block;
+}
+.scope-label .scope-role {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+}
+.scope-label .scope-ward {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.3;
+}
+.scope-label .scope-booth {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    line-height: 1.3;
 }
 
 .view-title {
@@ -3713,3 +3733,100 @@ mark.search-hl {
 
 .btn-font-size:hover { background: rgba(255, 255, 255, 0.2); }
 .btn-font-size:active { opacity: 0.7; }
+
+/* ── Activity filter bar ── */
+.activity-filter-bar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.btn-activity-filter {
+    font-family: var(--font);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-activity-filter.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+/* ── Bulk action bar ── */
+.bulk-action-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 10px;
+}
+
+.bulk-select-all-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.bulk-select-all-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.bulk-selected-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    flex: 1;
+}
+
+/* ── User row checkbox ── */
+.user-row-check {
+    display: flex;
+    align-items: center;
+    margin-right: 12px;
+}
+
+.user-row-check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+/* ── Login info line in user row ── */
+.user-row-login {
+    font-size: 0.625rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.user-row-login .login-count {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.user-row-login .login-never {
+    color: var(--warning);
+    font-weight: 500;
+}

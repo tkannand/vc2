@@ -176,6 +176,7 @@ const API = {
     addUser(data) { return this.post("/api/admin/users", data); },
     updateUser(phone, data) { return this.request("PUT", `/api/admin/users/${enc(phone)}`, data); },
     removeUser(phone) { return this.del(`/api/admin/users/${enc(phone)}`); },
+    bulkRemoveUsers(phones) { return this.post("/api/admin/users/bulk-remove", { phones }); },
     getUserLocations() { return this.get("/api/admin/user-locations"); },
     getUserActivityStats() { return this.get("/api/admin/user-activity-stats"); },
     updateUserSettings(phone, data) { return this.request("PATCH", `/api/admin/users/${enc(phone)}/settings`, data); },

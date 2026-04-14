@@ -2,6 +2,7 @@ import csv
 import json
 import os
 import structlog
+import openpyxl
 from collections import defaultdict
 from backend.config import settings
 from backend import storage
@@ -27,7 +28,7 @@ def _decode_tamil(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Voter Data — load ONCE from Voter_Data.csv
+# Voter Data — load ONCE from Voter.xlsx
 # ---------------------------------------------------------------------------
 
 def rebuild_dashboard_cache() -> dict:
@@ -153,8 +154,8 @@ def rebuild_dashboard_cache() -> dict:
     return {"wards": len(wards_list), "booth_partitions": len(voter_counts)}
 
 
-def _rebuild_booth_meta_from_csv() -> None:
-    """Read Voter_Data.csv to populate booth metadata (name, number, Tamil) in Settings.
+def _rebuild_booth_meta_from_xlsx() -> None:
+    """Read Voter.xlsx to populate booth metadata (name, number, Tamil) in Settings.
 
     Called once on first restart after this feature was added.
     """
@@ -164,25 +165,29 @@ def _rebuild_booth_meta_from_csv() -> None:
         return
 
     booth_meta: dict = {}
-    with open(path, encoding="latin-1", newline="") as f:
-        reader = csv.DictReader(f)
-        if reader.fieldnames and reader.fieldnames[0].startswith("\xff"):
-            reader.fieldnames[0] = reader.fieldnames[0].lstrip("\xff")
-        for row in reader:
-            ward_raw = (row.get("AC_NAME") or "").strip()
-            booth_raw = (row.get("Booth Number") or "").strip()
-            if not ward_raw or not booth_raw:
-                continue
-            # Skip rows where the normalized key would be empty (corrupt/non-ASCII ward names)
-            if not storage.normalize_key(ward_raw) or not storage.normalize_key(booth_raw):
-                continue
-            key = (ward_raw, booth_raw)
-            if key not in booth_meta:
-                booth_meta[key] = {
-                    "booth_number": (row.get("BOOTH") or "").strip(),
-                    "booth_name": (row.get("BOOTH NAME") or "").strip(),
-                    "booth_name_tamil": _decode_tamil(row.get("BOOTH NAME TAMIL") or ""),
-                }
+    wb = openpyxl.load_workbook(path, read_only=True)
+    ws = wb.active
+    headers = [str(c.value or "").strip() for c in next(ws.iter_rows(min_row=1, max_row=1))]
+    col = {h: i for i, h in enumerate(headers)}
+
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        ac_name = str(row[col.get("AC_NAME", 0)] or "").strip()
+        booth_num_raw = str(row[col.get("BOOTH", 4)] or "").strip()
+        if not ac_name or not booth_num_raw:
+            continue
+        # Generate "Booth # {number}" format to match existing partition keys
+        booth_raw = f"Booth # {int(float(booth_num_raw))}" if booth_num_raw.replace(".", "").isdigit() else f"Booth # {booth_num_raw}"
+        ward_raw = ac_name
+        if not storage.normalize_key(ward_raw) or not storage.normalize_key(booth_raw):
+            continue
+        key = (ward_raw, booth_raw)
+        if key not in booth_meta:
+            booth_meta[key] = {
+                "booth_number": booth_num_raw,
+                "booth_name": str(row[col.get("BOOTH NAME", 17)] or "").strip(),
+                "booth_name_tamil": str(row[col.get("BOOTH NAME - Tamil", 18)] or "").strip(),
+            }
+    wb.close()
 
     for (ward_raw, booth_raw), meta in booth_meta.items():
         storage.store_booth_meta(
@@ -195,9 +200,9 @@ def _rebuild_booth_meta_from_csv() -> None:
 
 
 def sync_voter_data_once() -> dict:
-    """Load Voter_Data.csv merged with Seg_Data.csv into the Voters table exactly once.
+    """Load Voter.xlsx merged with segment.csv into the Voters table exactly once.
 
-    All columns from both CSVs are stored on each voter entity.
+    All columns from both sources are stored on each voter entity.
     Ward/booth come from seg_data (Piv1/Booth) so partition keys match user assignments.
     Guards against re-running with the 'voter_data_loaded' flag in Settings.
     """
@@ -218,7 +223,7 @@ def sync_voter_data_once() -> dict:
             rebuild_dashboard_cache()
         if not storage.get_setting("booth_meta_stored"):
             logger.info("booth_meta_missing_rebuilding")
-            _rebuild_booth_meta_from_csv()
+            _rebuild_booth_meta_from_xlsx()
         else:
             logger.info("voter_data_already_loaded_skipping")
         return {"synced": 0, "skipped": 0, "status": "already_loaded"}
@@ -258,176 +263,201 @@ def sync_voter_data_once() -> dict:
     logger.info("voter_sync_seg_lookup_built",
                 seg_rows=len(seg_lookup), booths_mapped=len(booth_num_to_wb))
 
-    # ── Pass 2: read voter_data, merge ALL columns into one entity ───────────
+    # ── Pass 2: read voter_data (xlsx), merge ALL columns into one entity ────
     logger.info("voter_data_sync_started", path=voter_path)
     synced = 0
     skipped = 0
     errors  = 0
     batch   = []
+    seen_epics: set = set()  # deduplicate — xlsx may have duplicate EPICs
     skip_reasons = {"no_epic": 0, "in_seg": 0, "booth_fallback": 0,
-                    "no_booth_match": 0, "row_error": 0}
+                    "no_booth_match": 0, "duplicate": 0, "deleted": 0, "row_error": 0}
 
-    with open(voter_path, encoding="latin-1", newline="") as f:
-        reader = csv.DictReader(f)
-        if reader.fieldnames and reader.fieldnames[0].startswith("\xff"):
-            reader.fieldnames[0] = reader.fieldnames[0].lstrip("\xff")
-        for row in reader:
-            try:
-                voter_id = (row.get("EPIC") or "").strip()
-                if not voter_id or voter_id == "None":
-                    skip_reasons["no_epic"] += 1
+    wb = openpyxl.load_workbook(voter_path, read_only=True)
+    ws = wb.active
+    headers = [str(c.value or "").strip() for c in next(ws.iter_rows(min_row=1, max_row=1))]
+    col = {h: i for i, h in enumerate(headers)}
+
+    for row_tuple in ws.iter_rows(min_row=2, values_only=True):
+        voter_id = ""
+        try:
+            voter_id = str(row_tuple[col.get("EPIC", 6)] or "").strip()
+            if not voter_id or voter_id == "None":
+                skip_reasons["no_epic"] += 1
+                skipped += 1
+                continue
+            if voter_id in seen_epics:
+                skip_reasons["duplicate"] += 1
+                skipped += 1
+                continue
+            # Skip deleted voters
+            is_deleted = str(row_tuple[col.get("IS_DELETED", 16)] or "FALSE").strip().upper() == "TRUE"
+            if is_deleted:
+                skip_reasons["deleted"] += 1
+                skipped += 1
+                continue
+            seen_epics.add(voter_id)
+
+            seg = seg_lookup.get(voter_id, {})
+
+            # Ward / booth -- from seg_data (Piv1 / Booth)
+            ward  = (seg.get("Piv1")  or "").strip()
+            booth = (seg.get("Booth") or "").strip()
+            if ward and booth:
+                skip_reasons["in_seg"] += 1  # will sync
+            else:
+                # Voter not in seg -- infer ward from booth number
+                raw = str(row_tuple[col.get("BOOTH", 4)] or "").strip()
+                bnum = str(int(float(raw))) if raw.replace(".", "").isdigit() else raw
+                if bnum in booth_num_to_wb:
+                    ward, booth = booth_num_to_wb[bnum]
+                    skip_reasons["booth_fallback"] += 1  # will sync
+                else:
+                    skip_reasons["no_booth_match"] += 1
                     skipped += 1
                     continue
 
-                seg = seg_lookup.get(voter_id, {})
-
-                # Ward / booth — from seg_data (Piv1 / Booth)
-                ward  = (seg.get("Piv1")  or "").strip()
-                booth = (seg.get("Booth") or "").strip()
-                if ward and booth:
-                    skip_reasons["in_seg"] += 1  # will sync
+            # ── Voter_Data columns (xlsx -- already Unicode, no decoding) ──
+            name_en          = str(row_tuple[col.get("NAME_T", 8)] or "").strip().rstrip(" -").strip()
+            name_ta          = str(row_tuple[col.get("NAME_EN", 9)] or "").strip().rstrip(" -").strip()
+            relation_name_en = str(row_tuple[col.get("R_Name", 11)] or "").strip().rstrip(" -").strip()
+            relation_name_ta = str(row_tuple[col.get("REL_EN", 12)] or "").strip().rstrip(" -").strip()
+            relation_type    = str(row_tuple[col.get("R_TYPE", 10)] or "").strip()
+            booth_num_raw    = str(row_tuple[col.get("BOOTH", 4)] or "").strip()
+            # Generate "Booth # {number}" format from raw booth number
+            booth_number     = str(int(float(booth_num_raw))) if booth_num_raw.replace(".", "").isdigit() else booth_num_raw
+            booth_display    = f"Booth # {booth_number}"
+            booth_name       = str(row_tuple[col.get("BOOTH NAME", 17)] or "").strip()
+            booth_name_ta    = str(row_tuple[col.get("BOOTH NAME - Tamil", 18)] or "").strip()
+            section_num      = str(row_tuple[col.get("SECTION", 1)] or "").strip()
+            section_name     = str(row_tuple[col.get("SECTION_NAME", 2)] or "").strip()
+            # Tamil section name -- strip "{number}::" prefix, skip bad values
+            section_name_ta_raw = str(row_tuple[col.get("SECTION_NAME - Tamil", 3)] or "").strip()
+            section_name_ta  = ""
+            if section_name_ta_raw and section_name_ta_raw not in ("#N/A", "ADD_LIST::ADD_LIST"):
+                if "::" in section_name_ta_raw:
+                    section_name_ta = section_name_ta_raw.split("::", 1)[1].strip()
                 else:
-                    # Voter not in seg — infer ward from booth number (strip leading zeros)
-                    raw = (row.get("BOOTH") or "").strip()
-                    bnum = str(int(raw)) if raw.isdigit() else raw
-                    if bnum in booth_num_to_wb:
-                        ward, booth = booth_num_to_wb[bnum]
-                        skip_reasons["booth_fallback"] += 1  # will sync
-                    else:
-                        skip_reasons["no_booth_match"] += 1
-                        skipped += 1
-                        continue
+                    section_name_ta = section_name_ta_raw
+            ac_name          = str(row_tuple[col.get("AC_NAME", 0)] or "").strip()
+            house_vd         = str(row_tuple[col.get("HOUSE", 7)] or "").strip()
+            sl               = str(row_tuple[col.get("SL", 5)] or "").strip()
+            is_deleted       = str(row_tuple[col.get("IS_DELETED", 16)] or "FALSE").strip().upper() == "TRUE"
 
-                # ── Voter_Data columns ────────────────────────────────────────
-                name_en          = (row.get("NAME_T") or "").strip().rstrip(" -").strip()
-                name_ta          = _decode_tamil(row.get("NAME_EN") or "")
-                relation_name_en = (row.get("R_Name") or "").strip().rstrip(" -").strip()
-                relation_name_ta = _decode_tamil(row.get("REL_EN") or "")
-                relation_type    = (row.get("R_TYPE")        or "").strip()
-                booth_number     = (row.get("BOOTH")         or "").strip()  # "240"
-                booth_display    = (row.get("Booth Number")  or "").strip()  # "Booth # 240"
-                booth_name       = (row.get("BOOTH NAME")    or "").strip()
-                booth_name_ta    = _decode_tamil(row.get("BOOTH NAME TAMIL") or "")
-                section_num      = (row.get("SECTION")       or "").strip()
-                section_name     = (row.get("SECTION_NAME")  or "").strip()
-                street_name      = (row.get("Street Name")   or "").strip()
-                ac_name          = (row.get("AC_NAME")       or "").strip()
-                house_vd         = (row.get("HOUSE")         or "").strip()
-                sl               = (row.get("SL")            or "").strip()
-                vote_status      = (row.get("Status of Vote") or "").strip()
-                is_deleted       = (row.get("IS_DELETED") or "FALSE").strip().upper() == "TRUE"
+            age_vd = 0
+            try:
+                age_vd = int(float(row_tuple[col.get("AGE", 13)] or 0))
+            except (ValueError, TypeError):
+                pass
+            gender_vd = str(row_tuple[col.get("GENDER", 14)] or "").strip()
 
-                age_vd = 0
-                try:
-                    age_vd = int(float(row.get("AGE") or 0))
-                except (ValueError, TypeError):
-                    pass
-                gender_vd = (row.get("GENDER") or "").strip()
+            # ── Seg_Data columns (all plain ASCII/English) ───────────────
+            def _s(v): return (v or "").strip()
+            piv0          = _s(seg.get("Piv0"))
+            piv2          = _s(seg.get("Piv2"))
+            name_seg      = _s(seg.get("Name"))
+            rel_name_seg  = _s(seg.get("Relation Name"))
+            relationship  = _s(seg.get("Relationship"))
+            house         = storage.fix_excel_date(_s(seg.get("House")) or house_vd)
+            house2        = storage.fix_excel_date(_s(seg.get("House2")))
+            famcode       = _s(seg.get("Famcode"))
+            is_head       = _s(seg.get("Is Head of Household?")) or "No"
+            party_support = _s(seg.get("Party Support"))
+            phys_disabled = _s(seg.get("Physically Disabled"))
+            religion      = _s(seg.get("Religion"))
+            caste         = _s(seg.get("Caste"))
+            education     = _s(seg.get("Education"))
+            occupation    = _s(seg.get("Occupation"))
+            econ_status   = _s(seg.get("Economic Status"))
+            outside_voter = _s(seg.get("Outside Voter"))
+            phone_sr      = _s(seg.get("Phone (SR)"))
+            whatsapp      = _s(seg.get("WhatsApp"))
+            phone         = _s(seg.get("Phone"))
+            phone3        = _s(seg.get("Phone3"))
+            ration_card   = _s(seg.get("Ration Card"))
+            section_seg   = _s(seg.get("Section"))
 
-                # ── Seg_Data columns (all plain ASCII/English) ───────────────
-                def _s(v): return (v or "").strip()
-                piv0          = _s(seg.get("Piv0"))
-                piv2          = _s(seg.get("Piv2"))
-                name_seg      = _s(seg.get("Name"))
-                rel_name_seg  = _s(seg.get("Relation Name"))
-                relationship  = _s(seg.get("Relationship"))
-                house         = storage.fix_excel_date(_s(seg.get("House")) or house_vd)
-                house2        = storage.fix_excel_date(_s(seg.get("House2")))
-                famcode       = _s(seg.get("Famcode"))
-                is_head       = _s(seg.get("Is Head of Household?")) or "No"
-                party_support = _s(seg.get("Party Support"))
-                phys_disabled = _s(seg.get("Physically Disabled"))
-                religion      = _s(seg.get("Religion"))
-                caste         = _s(seg.get("Caste"))
-                education     = _s(seg.get("Education"))
-                occupation    = _s(seg.get("Occupation"))
-                econ_status   = _s(seg.get("Economic Status"))
-                outside_voter = _s(seg.get("Outside Voter"))
-                phone_sr      = _s(seg.get("Phone (SR)"))
-                whatsapp      = _s(seg.get("WhatsApp"))
-                phone         = _s(seg.get("Phone"))
-                phone3        = _s(seg.get("Phone3"))
-                ration_card   = _s(seg.get("Ration Card"))
-                section_seg   = _s(seg.get("Section"))
+            age    = age_vd
+            try:
+                if seg.get("Age"):
+                    age = int(float(seg["Age"]))
+            except (ValueError, TypeError):
+                pass
+            gender = (seg.get("Gender") or gender_vd).strip()
 
-                age    = age_vd
-                try:
-                    if seg.get("Age"):
-                        age = int(float(seg["Age"]))
-                except (ValueError, TypeError):
-                    pass
-                gender = (seg.get("Gender") or gender_vd).strip()
+            voter = {
+                "voter_id":           voter_id,
+                # Names
+                "name":               name_en,
+                "name_en":            name_en,
+                "name_ta":            name_ta,
+                "name_seg":           name_seg,
+                # Relations
+                "relation_name":      relation_name_en,
+                "relation_name_ta":   relation_name_ta,
+                "relation_name_seg":  rel_name_seg,
+                "relationship":       relation_type or relationship,
+                # Demographics
+                "age":                age,
+                "gender":             gender,
+                # Address
+                "house":              house,
+                "house2":             house2,
+                # Ward / Booth -- from seg_data (Piv1 / Booth)
+                "ward":               ward,        # "WARD 12A"
+                "booth":              booth,       # "Booth # 134"
+                "ac":                 ac_name,
+                "piv0":               piv0,        # "AC_191"
+                "piv2":               piv2,        # "Booth #134"
+                # Booth metadata -- from voter_data
+                "booth_number":       booth_number,   # "240"
+                "booth_display":      booth_display,  # "Booth # 240"
+                "booth_name":         booth_name,
+                "booth_name_tamil":   booth_name_ta,
+                # Section / street
+                "section":            section_name or section_seg,
+                "section_num":        section_num,
+                "section_name":       section_name,
+                "section_name_ta":    section_name_ta,
+                # Seg enrichment
+                "famcode":            famcode,
+                "is_head":            is_head,
+                "party_support":      party_support,
+                "physically_disabled": phys_disabled,
+                "religion":           religion,
+                "caste":              caste,
+                "education":          education,
+                "occupation":         occupation,
+                "economic_status":    econ_status,
+                "outside_voter":      outside_voter,
+                # Phones (encrypted by _build_voter_entity)
+                "phone_sr":           phone_sr,
+                "whatsapp":           whatsapp,
+                "phone":              phone,
+                "phone3":             phone3,
+                # Misc
+                "ration_card":        ration_card,
+                "sl":                 sl,
+                "is_deleted":         str(is_deleted),
+                "seg_synced":         "true" if seg else "false",
+            }
 
-                voter = {
-                    "voter_id":           voter_id,
-                    # Names
-                    "name":               name_en,
-                    "name_en":            name_en,
-                    "name_ta":            name_ta,
-                    "name_seg":           name_seg,
-                    # Relations
-                    "relation_name":      relation_name_en,
-                    "relation_name_ta":   relation_name_ta,
-                    "relation_name_seg":  rel_name_seg,
-                    "relationship":       relation_type or relationship,
-                    # Demographics
-                    "age":                age,
-                    "gender":             gender,
-                    # Address
-                    "house":              house,
-                    "house2":             house2,
-                    # Ward / Booth — from seg_data (Piv1 / Booth)
-                    "ward":               ward,        # "WARD 12A"
-                    "booth":              booth,       # "Booth # 134"
-                    "ac":                 ac_name,
-                    "piv0":               piv0,        # "AC_191"
-                    "piv2":               piv2,        # "Booth #134"
-                    # Booth metadata — from voter_data
-                    "booth_number":       booth_number,   # "240"
-                    "booth_display":      booth_display,  # "Booth # 240"
-                    "booth_name":         booth_name,
-                    "booth_name_tamil":   booth_name_ta,
-                    # Section / street
-                    "section":            section_name or section_seg,
-                    "section_num":        section_num,
-                    "section_name":       section_name,
-                    "street_name":        street_name,
-                    # Seg enrichment
-                    "famcode":            famcode,
-                    "is_head":            is_head,
-                    "party_support":      party_support,
-                    "physically_disabled": phys_disabled,
-                    "religion":           religion,
-                    "caste":              caste,
-                    "education":          education,
-                    "occupation":         occupation,
-                    "economic_status":    econ_status,
-                    "outside_voter":      outside_voter,
-                    # Phones (encrypted by _build_voter_entity)
-                    "phone_sr":           phone_sr,
-                    "whatsapp":           whatsapp,
-                    "phone":              phone,
-                    "phone3":             phone3,
-                    # Misc
-                    "ration_card":        ration_card,
-                    "vote_status":        vote_status,
-                    "sl":                 sl,
-                    "is_deleted":         str(is_deleted),
-                    "seg_synced":         "true" if seg else "false",
-                }
+            batch.append(voter)
+            synced += 1
 
-                batch.append(voter)
-                synced += 1
+        except Exception as e:
+            errors += 1
+            skip_reasons["row_error"] += 1
+            logger.error("voter_data_row_error", voter_id=voter_id, error=str(e)[:300])
 
-            except Exception as e:
-                errors += 1
-                skip_reasons["row_error"] += 1
-                logger.error("voter_data_row_error", voter_id=voter_id, error=str(e)[:300])
+    wb.close()
 
     logger.info("voter_data_batch_uploading", count=len(batch),
                 in_seg=skip_reasons["in_seg"], booth_fallback=skip_reasons["booth_fallback"],
                 no_booth_match=skip_reasons["no_booth_match"],
-                no_epic=skip_reasons["no_epic"], row_errors=skip_reasons["row_error"])
+                no_epic=skip_reasons["no_epic"], duplicates=skip_reasons["duplicate"],
+                deleted=skip_reasons["deleted"],
+                row_errors=skip_reasons["row_error"])
     storage.batch_upsert_voters(batch)
 
     # ── Build dashboard cache + booth metadata in one pass ───────────────────
@@ -570,11 +600,11 @@ def sync_voter_data_once() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Seg Data — incremental sync from Seg_Data.csv
+# Seg Data — incremental sync from segment.csv
 # ---------------------------------------------------------------------------
 
 def sync_seg_data_incremental() -> dict:
-    """Incrementally sync Seg_Data.csv on every restart.
+    """Incrementally sync segment.csv on every restart.
 
     Fetches the set of voter IDs already merged from seg data (via the
     seg_synced flag on each voter entity). Only processes rows whose

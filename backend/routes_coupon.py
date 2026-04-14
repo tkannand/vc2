@@ -63,6 +63,7 @@ def sanitize_coupon_voter(voter: dict) -> dict:
         "is_head":          voter.get("is_head", "No"),
         "house":            voter.get("house", ""),
         "section":          voter.get("section", ""),
+        "section_ta":       voter.get("section_name_ta", ""),
         "sl":               voter.get("sl", ""),
         "booth":            voter.get("booth", ""),
         "phone_last4":      _get_phone_last4(voter),
@@ -96,7 +97,7 @@ def _build_coupon_families(voters: list, custom_families: list, coupon_statuses:
         if famcode not in nat_families:
             nat_families[famcode] = {
                 "famcode": famcode, "members": [],
-                "house": v.get("house", ""), "section": v.get("section", ""),
+                "house": v.get("house", ""), "section": v.get("section", ""), "section_ta": v.get("section_name_ta", ""),
                 "head_name": "", "head_name_ta": "",
                 "is_custom": False,
             }

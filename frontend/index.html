@@ -300,6 +300,7 @@
             <!-- Super Admin: Dashboard (revamped) -->
             <section id="view-admin-home" class="view" style="display:none;">
                 <div class="view-content">
+                    <div id="admin-scope-label" class="scope-label"></div>
                     <h2 class="view-title" data-i18n="dashboard">Dashboard</h2>
 
                     <!-- Top filters -->
@@ -373,6 +374,20 @@
                             <button class="btn-role-filter" data-role="ward">Ward</button>
                             <button class="btn-role-filter" data-role="booth">Booth</button>
                             <button class="btn-role-filter" data-role="telecaller">Telecaller</button>
+                        </div>
+                        <div class="activity-filter-bar">
+                            <button class="btn-activity-filter active" data-activity="">All</button>
+                            <button class="btn-activity-filter" data-activity="active">Active (7d)</button>
+                            <button class="btn-activity-filter" data-activity="inactive">Inactive</button>
+                            <button class="btn-activity-filter" data-activity="never">Never Logged In</button>
+                        </div>
+                        <div id="bulk-action-bar" class="bulk-action-bar" style="display:none;">
+                            <label class="bulk-select-all-label">
+                                <input type="checkbox" id="chk-select-all">
+                                <span>Select All</span>
+                            </label>
+                            <span id="bulk-selected-count" class="bulk-selected-count"></span>
+                            <button id="btn-bulk-remove" class="btn btn-danger btn-sm" style="display:none;">Remove Selected</button>
                         </div>
                         <div id="user-list" class="user-list"></div>
                     </div>
@@ -710,6 +725,7 @@
                             <button class="tab" data-scheme-tab="other" data-i18n="other">Other</button>
                         </div>
                         <!-- Family panel -->
+                        <div id="ward-scheme-family-panel">
                             <div id="ward-scheme-family-summary" class="notice-summary-bar"></div>
                             <div id="ward-scheme-family-area"></div>
                             <div class="family-nav" id="ward-scheme-nav" style="display:none;">

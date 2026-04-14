@@ -173,15 +173,33 @@ const App = {
         const boothNum = this.user.booth_number || "";
         const boothLabel = boothNum ? `#${boothNum} ${boothName}`.trim() : boothName;
         const ward = this.user.ward || "";
+        const role = this.user.role || "";
+        const roleLabels = { ward: I18n.t("ward_supervisor"), booth: I18n.t("booth_worker") };
+
+        const buildScopeBox = (el, showBooth) => {
+            if (!el || !ward) return;
+            el.innerHTML = `
+                <div class="scope-role">${roleLabels[role] || role}</div>
+                <div class="scope-ward">${ward}</div>
+                ${showBooth && boothLabel ? `<div class="scope-booth">${boothLabel}</div>` : ""}
+            `;
+            el.style.display = "flex";
+        };
 
         const boothScope = document.getElementById("booth-scope-label");
-        if (boothScope && ward) {
-            boothScope.textContent = boothLabel ? `${ward} - ${boothLabel}` : ward;
-        }
+        buildScopeBox(boothScope, true);
 
         const wardScope = document.getElementById("ward-scope-label");
-        if (wardScope && ward) {
-            wardScope.textContent = ward;
+        buildScopeBox(wardScope, false);
+
+        // Admin dashboard scope
+        const adminScope = document.getElementById("admin-scope-label");
+        if (adminScope) {
+            if (role === "superadmin") {
+                adminScope.style.display = "none";
+            } else {
+                buildScopeBox(adminScope, role === "booth");
+            }
         }
     },
 

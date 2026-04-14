@@ -228,11 +228,11 @@ def _build_voter_entity(voter: dict) -> dict:
         "booth_display":      s("booth_display"),
         "booth_name":         s("booth_name"),
         "booth_name_tamil":   s("booth_name_tamil"),
-        # Section / street
+        # Section
         "section":            s("section"),
         "section_num":        s("section_num"),
         "section_name":       s("section_name"),
-        "street_name":        s("street_name"),
+        "section_name_ta":    s("section_name_ta"),
         # Seg enrichment
         "famcode":            s("famcode"),
         "is_head":            s("is_head", "No"),
@@ -251,7 +251,6 @@ def _build_voter_entity(voter: dict) -> dict:
         "phone3_enc":         encrypt_phone(voter.get("phone3", "")),
         # Misc
         "ration_card":        s("ration_card"),
-        "vote_status":        s("vote_status"),
         "sl":                 s("sl"),
         "is_deleted":         s("is_deleted", "False"),
         "seg_synced":         s("seg_synced", "false"),
@@ -458,6 +457,9 @@ def get_voters_by_booth(ward: str, booth: str) -> list:
         # SECTION_NAME always wins over seg section (which may contain ward names)
         if d.get("section_name"):
             d["section"] = d["section_name"]
+        # Ensure section_name_ta is always present for Tamil language display
+        if not d.get("section_name_ta"):
+            d["section_name_ta"] = ""
         result.append(d)
     return result
 
@@ -625,13 +627,14 @@ def get_booths_for_ward(ward: str) -> list:
 
 
 def get_sections_for_booth(ward: str, booth: str) -> list:
+    """Return sorted list of {section, section_ta} dicts for a booth."""
     voters = get_voters_by_booth(ward, booth)
-    sections = set()
+    sections: dict = {}  # section_name -> section_name_ta
     for v in voters:
         s = v.get("section", "")
-        if s:
-            sections.add(s)
-    return sorted(list(sections))
+        if s and s not in sections:
+            sections[s] = v.get("section_name_ta", "")
+    return [{"section": s, "section_ta": sections[s]} for s in sorted(sections.keys())]
 
 
 def get_voter_count() -> int:
@@ -739,6 +742,22 @@ def update_user_location(phone: str, lat: float, lng: float, ts: str):
             table.upsert_entity(entity)
         except ResourceNotFoundError:
             continue
+
+
+def record_login(phone: str):
+    """Increment login_count and set last_login_at on all role entities for a phone."""
+    from azure.data.tables import UpdateMode
+    table = get_table(table_name("Users"))
+    now = datetime.now(timezone.utc).isoformat()
+    for role in ["superadmin", "ward", "booth", "telecaller"]:
+        try:
+            entity = dict(table.get_entity(role, phone))
+            entity["login_count"] = entity.get("login_count", 0) + 1
+            entity["last_login_at"] = now
+            table.upsert_entity(entity)
+        except ResourceNotFoundError:
+            continue
+    logger.info("login_recorded", phone=phone[-4:])
 
 
 def get_users_by_role(role: str) -> list:
@@ -1346,6 +1365,7 @@ def sanitize_voter_for_coupon(voter: dict) -> dict:
         "sl":               voter.get("sl", ""),
         "booth":            voter.get("booth", ""),
         "section":          voter.get("section", ""),
+        "section_ta":       voter.get("section_name_ta", ""),
         "house":            voter.get("house", ""),
         "famcode":          voter.get("famcode", ""),
         "is_head":          voter.get("is_head", "No"),

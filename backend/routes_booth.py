@@ -25,6 +25,7 @@ def sanitize_voter(voter: dict, include_masked_phone: bool = True) -> dict:
         "is_head": voter.get("is_head", "No"),
         "party_support": voter.get("party_support", ""),
         "section": voter.get("section", ""),
+        "section_ta": voter.get("section_name_ta", ""),
         "booth": voter.get("booth", ""),
         "ward": voter.get("ward", ""),
     }
@@ -108,6 +109,7 @@ async def get_families(request: Request, ward: str, booth: str, street: str = ""
                 "members": [],
                 "house": v.get("house", ""),
                 "section": v.get("section", ""),
+                "section_ta": v.get("section_name_ta", ""),
                 "booth_name": v.get("booth_name", ""),
                 "booth_name_tamil": v.get("booth_name_tamil", ""),
                 "booth_number": v.get("booth_number", ""),
@@ -266,8 +268,9 @@ async def get_stats(request: Request, ward: str, booth: str):
     voters = storage.get_voters_by_booth(ward, booth)
     statuses = storage.get_all_call_statuses(ward, booth)
 
-    for section in sections:
-        sec_voters = [v for v in voters if v.get("section") == section]
+    for sec_info in sections:
+        sec_name = sec_info["section"]
+        sec_voters = [v for v in voters if v.get("section") == sec_name]
         sec_total = len(sec_voters)
         sec_called = 0
         sec_other = 0
@@ -279,7 +282,8 @@ async def get_stats(request: Request, ward: str, booth: str):
             elif s in ("didnt_answer", "skipped"):
                 sec_other += 1
         section_stats.append({
-            "section": section,
+            "section": sec_name,
+            "section_ta": sec_info.get("section_ta", ""),
             "total": sec_total,
             "called": sec_called,
             "not_called": sec_total - sec_called - sec_other,

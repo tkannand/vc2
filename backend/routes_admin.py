@@ -3,7 +3,7 @@ import structlog
 from fastapi import APIRouter, Request, HTTPException
 from typing import Optional
 from backend.middleware import require_role, get_client_ip
-from backend.models import AddUserRequest, UpdateUserSecurityRequest
+from backend.models import AddUserRequest, UpdateUserSecurityRequest, BulkRemoveRequest
 from backend import storage
 from backend.activity import log_page_view, log_user_management
 
@@ -204,6 +204,9 @@ async def get_users(request: Request):
             "last_lat": u.get("last_lat"),
             "last_lng": u.get("last_lng"),
             "last_location_at": u.get("last_location_at", ""),
+            # Login tracking
+            "login_count": u.get("login_count", 0),
+            "last_login_at": u.get("last_login_at", ""),
         })
     return {"users": result}
 
@@ -283,6 +286,34 @@ async def remove_user(request: Request, phone: str):
     storage.delete_user(phone, target["PartitionKey"])
     log_user_management(admin["phone"], "remove", phone, ip)
     return {"success": True, "message": "User removed"}
+
+
+@router.post("/users/bulk-remove")
+async def bulk_remove_users(request: Request, body: BulkRemoveRequest):
+    admin = require_role(request, "superadmin")
+    ip = get_client_ip(request)
+    admin_phone = admin["phone"]
+
+    removed = 0
+    skipped = 0
+    for phone in body.phones:
+        if phone == admin_phone:
+            skipped += 1
+            continue
+        user_roles = storage.get_user_roles(phone)
+        if not user_roles:
+            skipped += 1
+            continue
+        if any(u["PartitionKey"] == "superadmin" for u in user_roles):
+            skipped += 1
+            continue
+        for u in user_roles:
+            storage.delete_user(phone, u["PartitionKey"])
+        removed += 1
+
+    log_user_management(admin_phone, "bulk_remove", f"{removed}_users", ip)
+    logger.info("bulk_remove_completed", removed=removed, skipped=skipped, by=admin_phone[-4:])
+    return {"success": True, "removed": removed, "skipped": skipped}
 
 
 @router.patch("/users/{phone}/settings")
@@ -414,7 +445,12 @@ async def get_summary(
     role = user.get("role", "superadmin")
     if role == "ward":
         ward  = user.get("ward", "")   # force their ward regardless of query param
-        booth = ""                      # ward users see all booths in their ward
+        # booth param allowed — filters within their assigned ward
+        # validate booth belongs to this ward (empty = all booths)
+        if booth:
+            valid_booths = storage.get_booths_for_ward(ward)
+            if booth not in valid_booths:
+                booth = ""
     elif role == "booth":
         ward  = user.get("ward", "")   # force their ward
         booth = user.get("booth", "")  # force their booth
@@ -699,10 +735,48 @@ async def get_drill(request: Request, ward: str, booth: str = ""):
         notice_by_sec: dict  = {}
         coupon_by_sec: dict  = {}
         scheme_by_sec: dict  = {sc["id"]: {} for sc in custom_schemes}
+        section_ta_map: dict = {}  # section -> section_name_ta
+        demo_by_sec: dict    = {}  # per-section demographics
 
         for v in voters:
             section = (v.get("section") or v.get("section_name") or "Unknown").strip()
+            if section not in section_ta_map:
+                section_ta_map[section] = (v.get("section_name_ta") or "").strip()
             vid     = v.get("voter_id") or v.get("RowKey", "")
+
+            # Demographics: gender, age, surveyed, families — all voters
+            if section not in demo_by_sec:
+                demo_by_sec[section] = {
+                    "all_voters": 0, "surveyed": 0,
+                    "gm": 0, "gf": 0, "go": 0,
+                    "age_18_25": 0, "age_26_35": 0, "age_36_45": 0,
+                    "age_46_60": 0, "age_61_plus": 0,
+                    "famcodes": set(),
+                }
+            d = demo_by_sec[section]
+            d["all_voters"] += 1
+            if v.get("seg_synced") == "true":
+                d["surveyed"] += 1
+            gender = (v.get("gender") or "").upper()
+            if gender in ("M", "MALE"):
+                d["gm"] += 1
+            elif gender in ("F", "FEMALE"):
+                d["gf"] += 1
+            else:
+                d["go"] += 1
+            try:
+                age = int(v.get("age") or 0)
+            except (ValueError, TypeError):
+                age = 0
+            if age >= 18:
+                if age <= 25: d["age_18_25"] += 1
+                elif age <= 35: d["age_26_35"] += 1
+                elif age <= 45: d["age_36_45"] += 1
+                elif age <= 60: d["age_46_60"] += 1
+                else: d["age_61_plus"] += 1
+            fc = (v.get("famcode") or "").strip()
+            if fc:
+                d["famcodes"].add(fc)
 
             # Notice counts all voters
             if section not in notice_by_sec:
@@ -741,21 +815,37 @@ async def get_drill(request: Request, ward: str, booth: str = ""):
             elif cs == "skipped":
                 calling_by_sec[section]["skipped"] += 1
 
-        all_secs = sorted(set(calling_by_sec) | set(notice_by_sec) | set(coupon_by_sec))
+        all_secs = sorted(set(calling_by_sec) | set(notice_by_sec) | set(coupon_by_sec) | set(demo_by_sec))
         street_data = []
         for s in all_secs:
             c = calling_by_sec.get(s, {"total": 0, "called": 0, "didnt_answer": 0, "skipped": 0})
             n = notice_by_sec.get(s, {"total": 0, "delivered": 0})
             cp = coupon_by_sec.get(s, {"total": 0, "delivered": 0})
+            d = demo_by_sec.get(s, {"all_voters": 0, "surveyed": 0, "gm": 0, "gf": 0, "go": 0,
+                                     "age_18_25": 0, "age_26_35": 0, "age_36_45": 0,
+                                     "age_46_60": 0, "age_61_plus": 0, "famcodes": set()})
             c["not_called"] = c["total"] - c["called"] - c["didnt_answer"] - c["skipped"]
             c["completion_pct"] = round(c["called"] / c["total"] * 100 if c["total"] else 0, 1)
             item = {
                 "section":          s,
+                "section_ta":       section_ta_map.get(s, ""),
                 **c,
                 "notice_total":     n["total"],
                 "notice_delivered": n["delivered"],
                 "coupon_total":     cp["total"],
                 "coupon_delivered": cp["delivered"],
+                # Demographics
+                "all_voters":       d["all_voters"],
+                "surveyed":         d["surveyed"],
+                "families":         len(d["famcodes"]),
+                "gender_m":         d["gm"],
+                "gender_f":         d["gf"],
+                "gender_o":         d["go"],
+                "age_18_25":        d["age_18_25"],
+                "age_26_35":        d["age_26_35"],
+                "age_36_45":        d["age_36_45"],
+                "age_46_60":        d["age_46_60"],
+                "age_61_plus":      d["age_61_plus"],
             }
             for sc in custom_schemes:
                 sc_sec = scheme_by_sec[sc["id"]].get(s, {"total": 0, "delivered": 0})

@@ -90,6 +90,18 @@ class AddUserRequest(BaseModel):
         return v
 
 
+class BulkRemoveRequest(BaseModel):
+    phones: list[str] = Field(..., min_length=1, max_length=200)
+
+    @field_validator("phones")
+    @classmethod
+    def validate_phones(cls, v):
+        for p in v:
+            if not re.match(r"^\d{10}$", p):
+                raise ValueError(f"Invalid phone number: {p}")
+        return v
+
+
 class UpdateCallStatus(BaseModel):
     status: str
     notes: Optional[str] = Field(None, max_length=1000)

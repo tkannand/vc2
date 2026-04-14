@@ -295,7 +295,20 @@ def _create_session_response(phone: str, user: dict, ip: str = "") -> dict:
     token = create_token(phone, role, ward, booth, name)
     expires_at = (datetime.now(timezone.utc) + timedelta(hours=settings.SESSION_EXPIRY_HOURS)).isoformat()
     storage.store_session(token, phone, role, ward, booth, expires_at)
+    storage.record_login(phone)
     storage.log_activity(phone, "login_success", ip=ip, details=f"role={role}")
+
+    # Resolve booth display name for scope label
+    booth_name = ""
+    booth_number = ""
+    booth_name_tamil = ""
+    if ward and booth:
+        bi_map = storage.get_booth_info_map(ward)
+        info = bi_map.get(booth, {})
+        booth_name = info.get("booth_name", "")
+        booth_number = info.get("booth_number", "")
+        booth_name_tamil = info.get("booth_name_tamil", "")
+
     return {
         "success": True,
         "token": token,
@@ -305,6 +318,9 @@ def _create_session_response(phone: str, user: dict, ip: str = "") -> dict:
             "role": role,
             "ward": ward,
             "booth": booth,
+            "booth_name": booth_name,
+            "booth_number": booth_number,
+            "booth_name_tamil": booth_name_tamil,
             "language": user.get("language", "en"),
             "geo_tracking": bool(user.get("geo_tracking", True)),
         },

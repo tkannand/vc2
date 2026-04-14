@@ -210,7 +210,7 @@ const Booth = {
                     <div>
                         <div class="family-head-name">${this.escHtml(I18n.t("house"))}: ${this.escHtml(fam.house || "-")}</div>
                         <div class="family-meta">
-                            <span>${this.escHtml(fam.section || "")}</span>
+                            <span>${this.escHtml((I18n.currentLang === "ta" && fam.section_ta) ? fam.section_ta : (fam.section || ""))}</span>
                             ${boothLabel ? `<span>${this.escHtml(boothLabel)}</span>` : ""}
                         </div>
                     </div>
@@ -482,10 +482,11 @@ const Booth = {
         const sel = document.getElementById("booth-home-street-filter");
         if (sel) {
             sel.innerHTML = `<option value="">${I18n.t("all_streets")}</option>`;
+            const isTa = I18n.currentLang === "ta";
             (data.sections || []).forEach((s) => {
                 const opt = document.createElement("option");
                 opt.value = s.section;
-                opt.textContent = s.section;
+                opt.textContent = (isTa && s.section_ta) ? s.section_ta : s.section;
                 sel.appendChild(opt);
             });
         }
@@ -522,10 +523,11 @@ const Booth = {
 
     renderStreetList(sections) {
         const streetList = document.getElementById("booth-street-stats");
+        const isTa = I18n.currentLang === "ta";
         streetList.innerHTML = sections.map((s) => `
             <div class="street-stat-row">
                 <div class="stat-row-top">
-                    <span class="stat-row-name">${this.escHtml(s.section)}</span>
+                    <span class="stat-row-name">${this.escHtml((isTa && s.section_ta) ? s.section_ta : s.section)}</span>
                     <span class="stat-row-pct">${s.pct}%</span>
                 </div>
                 <div class="progress-bar-container"><div class="progress-bar" style="width:${s.pct}%"></div></div>

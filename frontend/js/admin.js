@@ -76,9 +76,24 @@ const Admin = {
             btn.addEventListener("click", () => {
                 document.querySelectorAll(".btn-role-filter").forEach((b) => b.classList.remove("active"));
                 btn.classList.add("active");
-                this.renderUserList(btn.dataset.role);
+                this._roleFilter = btn.dataset.role;
+                this._applyUserFilters();
             });
         });
+
+        // Activity filters
+        document.querySelectorAll(".btn-activity-filter").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                document.querySelectorAll(".btn-activity-filter").forEach((b) => b.classList.remove("active"));
+                btn.classList.add("active");
+                this._activityFilter = btn.dataset.activity;
+                this._applyUserFilters();
+            });
+        });
+
+        // Bulk action bar
+        document.getElementById("chk-select-all")?.addEventListener("change", (e) => this._onSelectAllChange(e.target.checked));
+        document.getElementById("btn-bulk-remove")?.addEventListener("click", () => this._bulkRemove());
 
         // Geo scheme tabs
         document.querySelectorAll("[data-geo-scheme]").forEach((btn) => {
@@ -339,6 +354,96 @@ const Admin = {
         this.renderSchemes(data.schemes || {});
     },
 
+    // ── Compute scheme cards from drill items (street-level data) ───────────
+    _schemesFromDrillItems(items) {
+        const customSchemes = this._summaryData?.schemes?.custom || [];
+        const noticeEnabled = this._summaryData?.schemes?.notice?.enabled;
+        const couponEnabled = this._summaryData?.schemes?.coupon?.enabled;
+
+        let ct = 0, cc = 0, cda = 0, csk = 0;
+        let nt = 0, nd = 0;
+        let pt = 0, pd = 0;
+        const csTotals = {};
+        customSchemes.forEach(sc => { csTotals[sc.id] = { total: 0, done: 0, name: sc.name }; });
+
+        for (const it of items) {
+            ct  += it.total        || 0;
+            cc  += it.called       || 0;
+            cda += it.didnt_answer || 0;
+            csk += it.skipped      || 0;
+            nt  += it.notice_total     || 0;
+            nd  += it.notice_delivered || 0;
+            pt  += it.coupon_total     || 0;
+            pd  += it.coupon_delivered || 0;
+            for (const sc of customSchemes) {
+                csTotals[sc.id].total += it[`scheme_${sc.id}_total`]     || 0;
+                csTotals[sc.id].done  += it[`scheme_${sc.id}_delivered`] || 0;
+            }
+        }
+
+        return {
+            calling: {
+                total: ct, done: cc, didnt_answer: cda, skipped: csk,
+                not_called: Math.max(0, ct - cc - cda - csk),
+                pct: ct > 0 ? Math.round(cc / ct * 1000) / 10 : 0,
+            },
+            notice: {
+                total: nt, done: nd, pending: nt - nd,
+                pct: nt > 0 ? Math.round(nd / nt * 1000) / 10 : 0,
+                enabled: noticeEnabled,
+            },
+            coupon: {
+                total: pt, done: pd, pending: pt - pd,
+                pct: pt > 0 ? Math.round(pd / pt * 1000) / 10 : 0,
+                enabled: couponEnabled,
+            },
+            custom: customSchemes.map(sc => ({
+                id: sc.id, name: csTotals[sc.id].name,
+                total: csTotals[sc.id].total,
+                done: csTotals[sc.id].done,
+                pending: csTotals[sc.id].total - csTotals[sc.id].done,
+                pct: csTotals[sc.id].total > 0
+                    ? Math.round(csTotals[sc.id].done / csTotals[sc.id].total * 1000) / 10 : 0,
+            })),
+        };
+    },
+
+    // ── Compute universe stats from drill items (street-level data) ─────────
+    _universeFromDrillItems(items) {
+        let totalVoters = 0, surveyed = 0, families = 0;
+        let gm = 0, gf = 0, go = 0;
+        let a1 = 0, a2 = 0, a3 = 0, a4 = 0, a5 = 0;
+
+        for (const it of items) {
+            totalVoters += it.all_voters || 0;
+            surveyed    += it.surveyed   || 0;
+            families    += it.families   || 0;
+            gm += it.gender_m  || 0;
+            gf += it.gender_f  || 0;
+            go += it.gender_o  || 0;
+            a1 += it.age_18_25  || 0;
+            a2 += it.age_26_35  || 0;
+            a3 += it.age_36_45  || 0;
+            a4 += it.age_46_60  || 0;
+            a5 += it.age_61_plus || 0;
+        }
+
+        return {
+            total_voters:    totalVoters,
+            surveyed_voters: surveyed,
+            total_families:  families > 0 ? families : null,
+            total_streets:   items.length,
+            gender: { M: gm, F: gf, O: go },
+            age_distribution: [
+                { bucket: "18-25", count: a1 },
+                { bucket: "26-35", count: a2 },
+                { bucket: "36-45", count: a3 },
+                { bucket: "46-60", count: a4 },
+                { bucket: "61+",   count: a5 },
+            ],
+        };
+    },
+
     // ── Scope filter bar (ward/booth users) ──────────────────────────────────
     _escAttr(s) { return (s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;"); },
 
@@ -351,9 +456,10 @@ const Admin = {
             bar.innerHTML = `
                 <select id="scope-street-sel" class="select-field select-sm">
                     <option value="">All Streets</option>
-                    ${(items || []).map(s =>
-                        `<option value="${this._escAttr(s.section)}">${Booth.escHtml(s.section)}</option>`
-                    ).join("")}
+                    ${(items || []).map(s => {
+                        const secLabel = (I18n.currentLang === "ta" && s.section_ta) ? s.section_ta : s.section;
+                        return `<option value="${this._escAttr(s.section)}">${Booth.escHtml(secLabel)}</option>`;
+                    }).join("")}
                 </select>`;
             bar.style.display = "";
             document.getElementById("scope-street-sel").addEventListener("change", (e) => {
@@ -361,6 +467,9 @@ const Admin = {
                 const filtered = street ? items.filter(s => s.section === street) : items;
                 this._drillItems = filtered;
                 this._renderGeoChart(filtered);
+                // Update scheme cards + universe from drill data
+                this.renderSchemes(this._schemesFromDrillItems(filtered));
+                this.renderUniverse(this._universeFromDrillItems(filtered));
             });
 
         } else if (scope.ward) {
@@ -417,15 +526,19 @@ const Admin = {
             // Populate street dropdown
             if (streetSel) {
                 streetSel.innerHTML = `<option value="">All Streets</option>` +
-                    (drillRes.items || []).map(s =>
-                        `<option value="${this._escAttr(s.section)}">${Booth.escHtml(s.section)}</option>`
-                    ).join("");
+                    (drillRes.items || []).map(s => {
+                        const secLabel = (I18n.currentLang === "ta" && s.section_ta) ? s.section_ta : s.section;
+                        return `<option value="${this._escAttr(s.section)}">${Booth.escHtml(secLabel)}</option>`;
+                    }).join("");
                 streetSel.style.display = "inline-block";
                 streetSel.value = "";
                 streetSel.onchange = (e) => {
                     const st = e.target.value;
                     const filtered = st ? this._drillItems.filter(s => s.section === st) : this._drillItems;
                     this._renderGeoChart(filtered);
+                    // Update scheme cards + universe from drill data
+                    this.renderSchemes(this._schemesFromDrillItems(filtered));
+                    this.renderUniverse(this._universeFromDrillItems(filtered));
                 };
             }
         }
@@ -813,7 +926,7 @@ const Admin = {
     },
 
     _geoLabel(item) {
-        if (this._drillBooth) return item.section;   // street level
+        if (this._drillBooth) return (I18n.currentLang === "ta" && item.section_ta) ? item.section_ta : item.section;   // street level
         if (this._drillWard)  return item.booth_number ? `#${item.booth_number}` : item.booth;
         return item.ward;
     },
@@ -1029,6 +1142,12 @@ const Admin = {
         }
     },
 
+    _USERS_PAGE: 20,
+    _usersShown: 0,
+    _usersFiltered: [],
+    _activityFilter: "",
+    _roleFilter: "",
+
     async loadUsers() {
         App.showViewLoading("view-admin-users");
         const [usersData] = await Promise.all([
@@ -1039,23 +1158,84 @@ const Admin = {
         if (usersData.error) return;
 
         this.allUsers = usersData.users || [];
-        const activeBtn = document.querySelector(".btn-role-filter.active");
-        this.renderUserList(activeBtn ? activeBtn.dataset.role : "");
+        this._applyUserFilters();
     },
 
-    renderUserList(roleFilter) {
+    _applyUserFilters() {
+        const role = this._roleFilter;
+        const activity = this._activityFilter;
+        let filtered = this.allUsers || [];
+
+        if (role) {
+            filtered = filtered.filter((u) => u.role === role);
+        }
+
+        if (activity === "active") {
+            const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            filtered = filtered.filter((u) => u.last_login_at && new Date(u.last_login_at).getTime() >= sevenDaysAgo);
+        } else if (activity === "inactive") {
+            const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            filtered = filtered.filter((u) => u.last_login_at && new Date(u.last_login_at).getTime() < sevenDaysAgo);
+        } else if (activity === "never") {
+            filtered = filtered.filter((u) => !u.login_count || u.login_count === 0);
+        }
+
+        this.renderUserList(filtered);
+    },
+
+    renderUserList(filteredUsers) {
+        this._usersFiltered = filteredUsers;
+        this._usersShown = 0;
+        document.getElementById("user-list").innerHTML = "";
+        // Reset bulk selection
+        const selectAll = document.getElementById("chk-select-all");
+        if (selectAll) selectAll.checked = false;
+        this._updateBulkBar();
+        // Show bulk action bar if there are any non-superadmin users
+        const hasSelectable = this._usersFiltered.some(u => u.role !== "superadmin");
+        const bulkBar = document.getElementById("bulk-action-bar");
+        if (bulkBar) bulkBar.style.display = hasSelectable ? "flex" : "none";
+        this._showMoreUsers();
+    },
+
+    _showMoreUsers() {
         const list = document.getElementById("user-list");
         const roleLabels = { superadmin: I18n.t("superadmin"), ward: I18n.t("ward_supervisor"), booth: I18n.t("booth_worker"), telecaller: I18n.t("telecaller") };
-        const users = roleFilter ? (this.allUsers || []).filter((u) => u.role === roleFilter) : (this.allUsers || []);
+        const users = this._usersFiltered;
+        const start = this._usersShown;
+        const end = Math.min(start + this._USERS_PAGE, users.length);
+        const slice = users.slice(start, end);
 
-        list.innerHTML = users.map((u) => {
+        // Remove old load-more button
+        list.querySelector(".btn-load-more-users")?.remove();
+
+        const frag = document.createDocumentFragment();
+        const temp = document.createElement("div");
+        temp.innerHTML = slice.map((u) => {
             const boothLabel = u.booth ? this.formatBoothLabel(u.booth_name, u.booth_number, 30, u.booth_name_tamil) : "";
             const disabledBadge = u.active === false ? `<span class="sec-badge sec-badge-disabled">Disabled</span>` : "";
             const locationBadge = (u.last_lat && u.last_lng)
-                ? `<a class="sec-badge sec-badge-location" href="https://www.google.com/maps?q=${u.last_lat},${u.last_lng}" target="_blank" rel="noopener">📍 ${this._fmtLocationAge(u.last_location_at)}</a>`
-                : (u.geo_tracking ? `<span class="sec-badge sec-badge-geo-pending" title="Geo tracking enabled, no fix yet">📍 —</span>` : "");
+                ? `<a class="sec-badge sec-badge-location" href="https://www.google.com/maps?q=${u.last_lat},${u.last_lng}" target="_blank" rel="noopener">${this._fmtLocationAge(u.last_location_at)}</a>`
+                : (u.geo_tracking ? `<span class="sec-badge sec-badge-geo-pending" title="Geo tracking enabled, no fix yet">--</span>` : "");
+
+            // Login info line
+            const loginCount = u.login_count || 0;
+            let loginLine = "";
+            if (loginCount > 0) {
+                const lastAge = this._fmtLocationAge(u.last_login_at);
+                loginLine = `<div class="user-row-login"><span class="login-count">${loginCount} login${loginCount !== 1 ? "s" : ""}</span><span>Last: ${lastAge}</span></div>`;
+            } else {
+                loginLine = `<div class="user-row-login"><span class="login-never">Never logged in</span></div>`;
+            }
+
+            // Checkbox for non-superadmin
+            const checkbox = u.role !== "superadmin"
+                ? `<div class="user-row-check"><input type="checkbox" class="chk-user" data-phone="${u.phone}"></div>`
+                : "";
+
             return `
             <div class="user-row">
+                ${checkbox}
                 <div class="user-row-info">
                     <div class="user-row-name">${Booth.escHtml(u.name)}</div>
                     <div class="user-row-meta">
@@ -1063,6 +1243,7 @@ const Admin = {
                         ${u.ward ? ` | ${u.ward}` : ""}${boothLabel ? ` | ${boothLabel}` : ""}
                         | ...${u.phone.slice(-4)}
                     </div>
+                    ${loginLine}
                     <div class="user-row-badges">${disabledBadge}${locationBadge}</div>
                 </div>
                 ${u.role !== "superadmin" ? `
@@ -1070,17 +1251,17 @@ const Admin = {
                     <button class="btn-edit btn btn-secondary btn-sm" data-phone="${u.phone}">${I18n.t("edit")}</button>
                     <button class="btn-remove btn btn-danger btn-sm" data-phone="${u.phone}" data-role="${u.role}">${I18n.t("remove")}</button>
                 </div>` : ""}
-            </div>
-        `}).join("");
+            </div>`;
+        }).join("");
 
-        list.querySelectorAll(".btn-edit").forEach((btn) => {
+        // Bind edit/remove on the new rows
+        temp.querySelectorAll(".btn-edit").forEach((btn) => {
             btn.addEventListener("click", () => {
                 const user = (this.allUsers || []).find(u => u.phone === btn.dataset.phone);
                 if (user) this.openEditUser(user);
             });
         });
-
-        list.querySelectorAll(".btn-remove").forEach((btn) => {
+        temp.querySelectorAll(".btn-remove").forEach((btn) => {
             btn.addEventListener("click", async () => {
                 if (!confirm(I18n.t("confirm_remove_user"))) return;
                 App.setBtnLoading(btn, true);
@@ -1092,6 +1273,62 @@ const Admin = {
                 }
             });
         });
+        // Bind checkbox changes
+        temp.querySelectorAll(".chk-user").forEach((chk) => {
+            chk.addEventListener("change", () => this._updateBulkBar());
+        });
+
+        while (temp.firstChild) frag.appendChild(temp.firstChild);
+        list.appendChild(frag);
+        this._usersShown = end;
+
+        // "Load More" button
+        if (end < users.length) {
+            const btn = document.createElement("button");
+            btn.className = "btn btn-secondary btn-load-more-users";
+            btn.style.cssText = "width:100%;margin-top:8px;padding:10px;font-size:0.85rem;";
+            btn.textContent = `Load More (${users.length - end} remaining)`;
+            btn.addEventListener("click", () => this._showMoreUsers());
+            list.appendChild(btn);
+        }
+    },
+
+    // ── Bulk selection helpers ────────────────────────────────────────────────
+    _getSelectedPhones() {
+        return Array.from(document.querySelectorAll(".chk-user:checked")).map(c => c.dataset.phone);
+    },
+
+    _updateBulkBar() {
+        const selected = this._getSelectedPhones();
+        const countEl = document.getElementById("bulk-selected-count");
+        const removeBtn = document.getElementById("btn-bulk-remove");
+        if (countEl) countEl.textContent = selected.length > 0 ? `${selected.length} selected` : "";
+        if (removeBtn) removeBtn.style.display = selected.length > 0 ? "inline-flex" : "none";
+    },
+
+    _onSelectAllChange(checked) {
+        document.querySelectorAll(".chk-user").forEach((chk) => { chk.checked = checked; });
+        this._updateBulkBar();
+    },
+
+    async _bulkRemove() {
+        const phones = this._getSelectedPhones();
+        if (!phones.length) return;
+        if (!confirm(`Remove ${phones.length} user${phones.length !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+
+        const btn = document.getElementById("btn-bulk-remove");
+        if (btn) App.setBtnLoading(btn, true);
+        const result = await API.bulkRemoveUsers(phones);
+        if (btn) App.setBtnLoading(btn, false);
+
+        if (result.success) {
+            const msg = `Removed ${result.removed} user${result.removed !== 1 ? "s" : ""}` +
+                (result.skipped > 0 ? ` (${result.skipped} skipped)` : "");
+            App.showToast(msg);
+            this.loadUsers();
+        } else {
+            App.showToast(result.detail || "Bulk remove failed");
+        }
     },
 
     _editingPhone: null,
@@ -1302,6 +1539,10 @@ const Admin = {
         this.loadUsers();
     },
 
+    _LOC_PAGE: 20,
+    _locUsers: [],
+    _locShown: 0,
+
     async loadActivity() {
         const container = document.getElementById("activity-location-table");
         if (!container) return;
@@ -1310,7 +1551,8 @@ const Admin = {
         const res = await API.getUserLocations();
         if (res.error) { container.innerHTML = `<p class="empty-state">${res.detail}</p>`; return; }
 
-        const users = res.users || [];
+        this._locUsers = res.users || [];
+        const users = this._locUsers;
         const roleLabels = { superadmin: "Admin", ward: "Ward", booth: "Booth", telecaller: "Telecaller" };
 
         const withLoc = users.filter(u => u.last_lat && u.last_lng);
@@ -1327,7 +1569,29 @@ const Admin = {
 
         if (!users.length) { container.innerHTML = `<p class="empty-state">No users found.</p>`; return; }
 
-        const rows = users.map(u => {
+        // Render table header + first page
+        const firstSlice = users.slice(0, this._LOC_PAGE);
+        container.innerHTML = `<table class="data-table">
+            <thead><tr>
+                <th>Name</th><th>Phone</th><th>Role</th><th>Ward</th><th>Last Location</th>
+            </tr></thead>
+            <tbody>${this._locRows(firstSlice)}</tbody>
+        </table>`;
+        this._locShown = firstSlice.length;
+
+        if (this._locShown < users.length) {
+            const btn = document.createElement("button");
+            btn.className = "btn btn-secondary btn-load-more-loc";
+            btn.style.cssText = "width:100%;margin-top:8px;padding:10px;font-size:0.85rem;";
+            btn.textContent = `Load More (${users.length - this._locShown} remaining)`;
+            btn.addEventListener("click", () => this._showMoreLoc());
+            container.appendChild(btn);
+        }
+    },
+
+    _locRows(slice) {
+        const roleLabels = { superadmin: "Admin", ward: "Ward", booth: "Booth", telecaller: "Telecaller" };
+        return slice.map(u => {
             const age = this._fmtLocationAge(u.last_location_at);
             const locCell = (u.last_lat && u.last_lng)
                 ? `<a class="loc-map-link" href="https://www.google.com/maps?q=${u.last_lat},${u.last_lng}" target="_blank" rel="noopener">📍 ${age}</a>`
@@ -1342,13 +1606,27 @@ const Admin = {
                 <td>${locCell}</td>
             </tr>`;
         }).join("");
+    },
 
-        container.innerHTML = `<table class="data-table">
-            <thead><tr>
-                <th>Name</th><th>Phone</th><th>Role</th><th>Ward</th><th>Last Location</th>
-            </tr></thead>
-            <tbody>${rows}</tbody>
-        </table>`;
+    _showMoreLoc() {
+        const container = document.getElementById("activity-location-table");
+        if (!container) return;
+        const tbody = container.querySelector("tbody");
+        if (!tbody) return;
+        const start = this._locShown;
+        const end = Math.min(start + this._LOC_PAGE, this._locUsers.length);
+        tbody.insertAdjacentHTML("beforeend", this._locRows(this._locUsers.slice(start, end)));
+        this._locShown = end;
+
+        container.querySelector(".btn-load-more-loc")?.remove();
+        if (end < this._locUsers.length) {
+            const btn = document.createElement("button");
+            btn.className = "btn btn-secondary btn-load-more-loc";
+            btn.style.cssText = "width:100%;margin-top:8px;padding:10px;font-size:0.85rem;";
+            btn.textContent = `Load More (${this._locUsers.length - end} remaining)`;
+            btn.addEventListener("click", () => this._showMoreLoc());
+            container.appendChild(btn);
+        }
     },
 
     async loadSyncFailures() {

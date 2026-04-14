@@ -97,9 +97,12 @@ const Notice = {
 
         // Populate street filter
         const streetSel = document.getElementById("booth-notice-street-filter");
-        const streets = [...new Set(families.flatMap(f => f.members.map(m => m.section).filter(Boolean)))].sort();
+        const streetMap = {};
+        families.forEach(f => f.members.forEach(m => { if (m.section && !streetMap[m.section]) streetMap[m.section] = m.section_ta || ""; }));
+        const streets = Object.keys(streetMap).sort();
         streetSel.innerHTML = `<option value="">All Streets</option>`;
-        streets.forEach(s => { const o = document.createElement("option"); o.value = s; o.textContent = s; streetSel.appendChild(o); });
+        const isTa = I18n.currentLang === "ta";
+        streets.forEach(s => { const o = document.createElement("option"); o.value = s; o.textContent = (isTa && streetMap[s]) ? streetMap[s] : s; streetSel.appendChild(o); });
 
         this._updateBoothNoticeSummary(res.delivered, res.total);
         this._applyBoothNoticeFilters();
@@ -329,10 +332,11 @@ const Notice = {
 
         const streetList = document.getElementById("booth-notice-street-stats");
         if (res.sections && res.sections.length > 0) {
+            const isTa = I18n.currentLang === "ta";
             streetList.innerHTML = res.sections.map((s) => `
                 <div class="street-stat-row">
                     <div class="stat-row-top">
-                        <span class="stat-row-name">${s.section}</span>
+                        <span class="stat-row-name">${(isTa && s.section_ta) ? s.section_ta : s.section}</span>
                         <span class="stat-row-pct">${s.pct}%</span>
                     </div>
                     <div class="progress-bar-container">
@@ -468,15 +472,16 @@ const Notice = {
 
         // Update street options when booth changes
         if (booth) {
-            const streets = [...new Set(
-                this.wardNoticeFamiliesAll
-                    .filter((f) => f.booth === booth)
-                    .flatMap((f) => f.members.map((m) => m.section).filter(Boolean))
-            )].sort();
+            const streetMap = {};
+            this.wardNoticeFamiliesAll
+                .filter((f) => f.booth === booth)
+                .forEach(f => f.members.forEach(m => { if (m.section && !streetMap[m.section]) streetMap[m.section] = m.section_ta || ""; }));
+            const streets = Object.keys(streetMap).sort();
             const streetSel = document.getElementById("ward-notice-street-filter");
             const cur = streetSel.value;
+            const isTa = I18n.currentLang === "ta";
             streetSel.innerHTML = `<option value="">All Streets</option>`;
-            streets.forEach((s) => { const o = document.createElement("option"); o.value = s; o.textContent = s; streetSel.appendChild(o); });
+            streets.forEach((s) => { const o = document.createElement("option"); o.value = s; o.textContent = (isTa && streetMap[s]) ? streetMap[s] : s; streetSel.appendChild(o); });
             if (streets.includes(cur)) streetSel.value = cur;
         }
     },
@@ -575,7 +580,9 @@ const Notice = {
         const members = fam.members || [];
         const deliveredCount = members.filter(m => m.status === "delivered").length;
         const allDelivered = deliveredCount === members.length;
-        const section = members[0]?.section || "";
+        const sectionEn = members[0]?.section || "";
+        const sectionTa = members[0]?.section_ta || "";
+        const section = (isTamil && sectionTa) ? sectionTa : sectionEn;
 
         let html = `<div class="family-card ncc">`;
 
@@ -1134,7 +1141,8 @@ const Notice = {
                 const headName = this.escapeHtml(
                     isTamil ? (fam.head_name_ta || fam.head_name || "Family") : (fam.head_name || "Family")
                 );
-                const section = fam.members.length > 0 ? this.escapeHtml(fam.members[0].section || "") : "";
+                const sectionRaw = fam.members.length > 0 ? ((isTamil && fam.members[0].section_ta) ? fam.members[0].section_ta : (fam.members[0].section || "")) : "";
+                const section = this.escapeHtml(sectionRaw);
 
                 html += `<div class="notice-family-group">`;
                 html += `<div class="notice-family-header">`;
