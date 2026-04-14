@@ -491,6 +491,10 @@ TRANSLATIONS = {
         "en": "Are you sure you want to delete this family?",
         "ta": "இந்த குடும்பத்தை நீக்க விரும்புகிறீர்களா?"
     },
+    "confirm_remove_member": {
+        "en": "Are you sure you want to remove this member from the family?",
+        "ta": "இந்த உறுப்பினரை குடும்பத்திலிருந்து நீக்க விரும்புகிறீர்களா?"
+    },
     "back": {
         "en": "Back",
         "ta": "பின்"
@@ -890,6 +894,22 @@ TRANSLATIONS = {
     "searching": {
         "en": "Searching…",
         "ta": "தேடுகிறது…"
+    },
+    "search_by_voter_id": {
+        "en": "Voter ID",
+        "ta": "வாக்காளர் எண்"
+    },
+    "search_by_sl": {
+        "en": "SL No",
+        "ta": "வரிசை எண்"
+    },
+    "search_voter_id_placeholder": {
+        "en": "Enter Voter ID (EPIC)…",
+        "ta": "வாக்காளர் எண் உள்ளிடுக…"
+    },
+    "search_sl_placeholder": {
+        "en": "Enter SL number…",
+        "ta": "வரிசை எண் உள்ளிடுக…"
     },
     "add_member": {
         "en": "+ Add",

@@ -595,8 +595,12 @@
                 <div class="modal-overlay" id="btn-coupon-builder-close-overlay"></div>
                 <div class="modal-content" style="max-height:80vh;display:flex;flex-direction:column;">
                     <h3 data-i18n="build_family" style="margin:0 0 12px;">Build Family</h3>
-                    <div class="filter-bar">
-                        <input id="coupon-builder-search" class="select-field" type="search" data-i18n="id_label" placeholder="Enter Voter ID (EPIC)…" autocomplete="off"/>
+                    <div class="filter-bar builder-search-bar">
+                        <select id="coupon-builder-search-mode" class="select-field select-sm">
+                            <option value="voter_id" data-i18n="search_by_voter_id">Voter ID</option>
+                            <option value="sl" data-i18n="search_by_sl">SL No</option>
+                        </select>
+                        <input id="coupon-builder-search" class="select-field" type="search" placeholder="Enter Voter ID (EPIC)…" autocomplete="off"/>
                     </div>
                     <div id="coupon-builder-search-results" style="flex:1;overflow-y:auto;margin-bottom:8px;"></div>
                     <div style="border-top:1px solid var(--border-light);padding-top:10px;">

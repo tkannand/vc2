@@ -236,6 +236,7 @@ const Scheme = {
 
         if (state.tab === "family") this._renderBoothFamilies();
         else this._renderBoothOther();
+        this._refreshSummary("booth");
     },
 
     _renderBoothFamilies() {
@@ -409,6 +410,7 @@ const Scheme = {
 
         if (state.tab === "family") this._renderWardFamilies();
         else this._renderWardOther();
+        this._refreshSummary("ward");
     },
 
     _renderWardFamilies() {
@@ -811,15 +813,17 @@ const Scheme = {
             </div>`;
         };
 
-        const allFamilies = [...state.familiesAll, ...state.ungroupedAll];
+        const filteredFamilies = state.families || state.familiesAll;
+        const filteredUngrouped = state.ungrouped || state.ungroupedAll;
+        const allFamilies = [...filteredFamilies, ...filteredUngrouped];
         const allMembers  = allFamilies.flatMap(f => f.members);
 
         // Overall bar (above tabs)
         fillBar(`${p}-summary`,    allFamilies,        allMembers,                               I18n.t("families"), I18n.t("voters_label"));
         // Family tab bar
-        fillBar(`${p}-family-summary`, state.familiesAll, state.familiesAll.flatMap(f => f.members), I18n.t("families"), I18n.t("voters_label"));
+        fillBar(`${p}-family-summary`, filteredFamilies, filteredFamilies.flatMap(f => f.members), I18n.t("families"), I18n.t("voters_label"));
         // Other tab bar — single voters, no family count needed
-        fillBar(`${p}-other-summary`,  [],               state.ungroupedAll.flatMap(f => f.members), "", I18n.t("voters_label"));
+        fillBar(`${p}-other-summary`,  [],               filteredUngrouped.flatMap(f => f.members), "", I18n.t("voters_label"));
     },
 
     // ── Shared helpers ────────────────────────────────────────────
@@ -1116,6 +1120,7 @@ const Scheme = {
         state.ungrouped = this._filterFams(state.ungroupedAll, "", state.otherSearch);
         if (state.tab === "family") this._renderAdminFamilies();
         else this._renderAdminOther();
+        this._refreshSummary("admin");
     },
 
     _renderAdminFamilies() {
@@ -1526,13 +1531,29 @@ const Scheme = {
         const overlay = clone("btn-coupon-builder-close-overlay");
         const submit  = clone("btn-coupon-builder-submit");
         const search  = clone("coupon-builder-search");
+        const searchMode = clone("coupon-builder-search-mode");
 
         if (submit) submit.textContent = editOpts ? I18n.t("save_changes") : I18n.t("create_family");
         if (cancel)  cancel.addEventListener("click",  () => this._closeModal());
         if (overlay) overlay.addEventListener("click", () => this._closeModal());
         if (submit)  submit.addEventListener("click",  () => this._submitModal(mode));
+
+        // Set initial dropdown value and placeholder
+        if (searchMode) {
+            searchMode.value = "voter_id";
+            searchMode.addEventListener("change", () => {
+                const isVoterId = searchMode.value === "voter_id";
+                if (search) {
+                    search.placeholder = isVoterId ? I18n.t("search_voter_id_placeholder") : I18n.t("search_sl_placeholder");
+                    search.value = "";
+                }
+                document.getElementById("coupon-builder-search-results").innerHTML = "";
+            });
+        }
+
         if (search) {
             search.value = "";
+            search.placeholder = I18n.t("search_voter_id_placeholder");
             let _bt;
             search.addEventListener("input", () => { clearTimeout(_bt); _bt = setTimeout(() => this._modalSearch(), 350); });
         }
@@ -1576,7 +1597,9 @@ const Scheme = {
                 <button class="btn btn-danger btn-sm btn-scheme-modal-remove" data-voter="${v.voter_id}">✕</button>
             </div>`).join("");
         list.querySelectorAll(".btn-scheme-modal-remove").forEach(btn => {
-            btn.addEventListener("click", () => {
+            btn.addEventListener("click", async () => {
+                const ok = await Notice.confirmUndeliver("confirm_remove_member");
+                if (!ok) return;
                 this._modalPending = this._modalPending.filter(v => v.voter_id !== btn.dataset.voter);
                 this._renderModalPending();
                 this._modalSearch();
@@ -1585,6 +1608,16 @@ const Scheme = {
     },
 
     async _modalSearch() {
+        const searchMode = document.getElementById("coupon-builder-search-mode")?.value || "voter_id";
+        if (searchMode === "sl") {
+            this._modalSearchBySl();
+        } else {
+            await this._modalSearchByVoterId();
+        }
+    },
+
+    // Search by Voter ID — global API search (original behavior)
+    async _modalSearchByVoterId() {
         const q = (document.getElementById("coupon-builder-search")?.value || "").trim();
         const resultsEl = document.getElementById("coupon-builder-search-results");
         if (!resultsEl) return;
@@ -1602,6 +1635,40 @@ const Scheme = {
         const matches = (res.results || []).filter(m => !pendingIds.has(m.voter_id));
         if (!matches.length) { resultsEl.innerHTML = `<div class="empty-state"><p>${I18n.t("no_results")}</p></div>`; return; }
         const qLow = q.toLowerCase();
+        this._renderModalSearchResults(matches, qLow);
+    },
+
+    // Search by SL — local search within already loaded data
+    _modalSearchBySl() {
+        const q = (document.getElementById("coupon-builder-search")?.value || "").trim();
+        const resultsEl = document.getElementById("coupon-builder-search-results");
+        if (!resultsEl) return;
+        if (!q) { resultsEl.innerHTML = ""; return; }
+
+        // Get loaded data from the current mode
+        const mode  = this._modalMode;
+        const state = mode === "booth" ? this.boothMode : mode === "ward" ? this.wardMode : this.adminMode;
+        const allFams = [...(state.familiesAll || []), ...(state.ungroupedAll || [])];
+
+        // Flatten all members from all families
+        const allMembers = allFams.flatMap(f => (f.members || []).map(m => ({ ...m, booth: m.booth || f.booth || "", ward: m.ward || "" })));
+
+        // Filter by SL prefix/match
+        const pendingIds = new Set(this._modalPending.map(v => v.voter_id));
+        const qLow = q.toLowerCase();
+        const matches = allMembers
+            .filter(m => (m.sl || "").toLowerCase().includes(qLow) && !pendingIds.has(m.voter_id))
+            .slice(0, 10);
+
+        if (!matches.length) { resultsEl.innerHTML = `<div class="empty-state"><p>${I18n.t("no_results")}</p></div>`; return; }
+        this._renderModalSearchResults(matches, qLow);
+    },
+
+    // Shared renderer for modal search results
+    _renderModalSearchResults(matches, qLow) {
+        const resultsEl = document.getElementById("coupon-builder-search-results");
+        if (!resultsEl) return;
+        const isTamil = I18n.currentLang === "ta";
         resultsEl.innerHTML = matches.map(m => {
             const name = isTamil ? (m.name_ta || m.name_en || m.name || "") : (m.name_en || m.name || "");
             const wb   = [m.ward, m.booth].filter(Boolean).join(" · ");

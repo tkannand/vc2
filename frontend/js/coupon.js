@@ -393,7 +393,9 @@ const Coupon = {
         }).join("");
 
         list.querySelectorAll(".btn-remove-member").forEach(btn => {
-            btn.addEventListener("click", () => {
+            btn.addEventListener("click", async () => {
+                const ok = await Notice.confirmUndeliver("confirm_remove_member");
+                if (!ok) return;
                 const vid = btn.dataset.voter;
                 const fam = this.boothCouponFamiliesAll.find(f => f.famcode === this.editingFamcode);
                 if (fam) { fam.members = fam.members.filter(m => m.voter_id !== vid); this._renderEditPanel(fam); }
@@ -590,13 +592,29 @@ const Coupon = {
         const overlay = clone("btn-coupon-builder-close-overlay");
         const submit  = clone("btn-coupon-builder-submit");
         const search  = clone("coupon-builder-search");
+        const searchMode = clone("coupon-builder-search-mode");
 
         if (submit) submit.textContent = editOpts ? "Save Changes" : "Create Family";
         if (cancel)  cancel.addEventListener("click",  () => this._closeFamilyBuilderModal());
         if (overlay) overlay.addEventListener("click", () => this._closeFamilyBuilderModal());
         if (submit)  submit.addEventListener("click",  () => this._submitFamilyFromModal(mode));
+
+        // Search mode dropdown
+        if (searchMode) {
+            searchMode.value = "voter_id";
+            searchMode.addEventListener("change", () => {
+                const isVoterId = searchMode.value === "voter_id";
+                if (search) {
+                    search.placeholder = isVoterId ? I18n.t("search_voter_id_placeholder") : I18n.t("search_sl_placeholder");
+                    search.value = "";
+                }
+                document.getElementById("coupon-builder-search-results").innerHTML = "";
+            });
+        }
+
         if (search)  {
             search.value = "";
+            search.placeholder = I18n.t("search_voter_id_placeholder");
             let _bt;
             search.addEventListener("input", () => {
                 clearTimeout(_bt);
@@ -642,6 +660,16 @@ const Coupon = {
     },
 
     async _builderSearch(mode) {
+        const searchMode = document.getElementById("coupon-builder-search-mode")?.value || "voter_id";
+        if (searchMode === "sl") {
+            this._builderSearchBySl(mode);
+        } else {
+            await this._builderSearchByVoterId(mode);
+        }
+    },
+
+    // Search by Voter ID — global API search (original behavior)
+    async _builderSearchByVoterId(mode) {
         const q = (document.getElementById("coupon-builder-search")?.value || "").trim();
         const resultsEl = document.getElementById("coupon-builder-search-results");
         if (!resultsEl) return;
@@ -649,15 +677,45 @@ const Coupon = {
             resultsEl.innerHTML = q.length > 0 ? `<div class="empty-state"><p>Type ${3 - q.length} more character${3 - q.length > 1 ? "s" : ""}…</p></div>` : "";
             return;
         }
-        resultsEl.innerHTML = `<div style="padding:8px;color:var(--text-muted);font-size:0.8rem;">Searching…</div>`;
-        const isTamil = I18n.currentLang === "ta";
+        resultsEl.innerHTML = `<div style="padding:8px;color:var(--text-muted);font-size:0.8rem;">${I18n.t("searching")}</div>`;
         const pendingIds = new Set(this.pendingFamilyVoters.map(v => v.voter_id));
-        // Server-side cross-ward search
         const res = await API.searchCouponVoters(q);
-        if (res.error) { resultsEl.innerHTML = `<div class="empty-state"><p>Search failed</p></div>`; return; }
+        if (res.error) { resultsEl.innerHTML = `<div class="empty-state"><p>${I18n.t("search_failed")}</p></div>`; return; }
         const matches = (res.results || []).filter(m => !pendingIds.has(m.voter_id));
-        if (!matches.length) { resultsEl.innerHTML = `<div class="empty-state"><p>No results</p></div>`; return; }
+        if (!matches.length) { resultsEl.innerHTML = `<div class="empty-state"><p>${I18n.t("no_results")}</p></div>`; return; }
         const qLow = q.toLowerCase();
+        this._renderBuilderSearchResults(matches, qLow, mode);
+    },
+
+    // Search by SL — local search within already loaded data
+    _builderSearchBySl(mode) {
+        const q = (document.getElementById("coupon-builder-search")?.value || "").trim();
+        const resultsEl = document.getElementById("coupon-builder-search-results");
+        if (!resultsEl) return;
+        if (!q) { resultsEl.innerHTML = ""; return; }
+
+        // Get loaded data from the current coupon mode
+        const allFams = mode === "booth" ? this.boothCouponFamiliesAll
+            : mode === "ward" ? this.wardCouponFamiliesAll
+            : this.adminCouponFamiliesAll;
+
+        const allMembers = (allFams || []).flatMap(f => (f.members || []).map(m => ({ ...m, booth: m.booth || f.booth || "", ward: m.ward || "" })));
+
+        const pendingIds = new Set(this.pendingFamilyVoters.map(v => v.voter_id));
+        const qLow = q.toLowerCase();
+        const matches = allMembers
+            .filter(m => (m.sl || "").toLowerCase().includes(qLow) && !pendingIds.has(m.voter_id))
+            .slice(0, 10);
+
+        if (!matches.length) { resultsEl.innerHTML = `<div class="empty-state"><p>${I18n.t("no_results")}</p></div>`; return; }
+        this._renderBuilderSearchResults(matches, qLow, mode);
+    },
+
+    // Shared renderer for builder search results
+    _renderBuilderSearchResults(matches, qLow, mode) {
+        const resultsEl = document.getElementById("coupon-builder-search-results");
+        if (!resultsEl) return;
+        const isTamil = I18n.currentLang === "ta";
         resultsEl.innerHTML = matches.map(m => {
             const name = isTamil ? (m.name_ta || m.name_en || m.name || "") : (m.name_en || m.name || "");
             const wardBooth = [m.ward, m.booth].filter(Boolean).join(" · ");
@@ -972,7 +1030,9 @@ const Coupon = {
             </div>`;
         }).join("");
         list.querySelectorAll(".btn-remove-ward-member").forEach(btn => {
-            btn.addEventListener("click", () => {
+            btn.addEventListener("click", async () => {
+                const ok = await Notice.confirmUndeliver("confirm_remove_member");
+                if (!ok) return;
                 const fam = this.wardCouponFamiliesAll.find(f => f.famcode === this.wardEditingFamcode);
                 if (fam) { fam.members = fam.members.filter(m => m.voter_id !== btn.dataset.voter); this._renderWardEditPanel(fam); }
             });

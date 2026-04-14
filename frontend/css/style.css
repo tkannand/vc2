@@ -1183,6 +1183,24 @@ body {
     flex-shrink: 0;
 }
 
+/* Builder modal search bar (dropdown + input side by side) */
+.builder-search-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.builder-search-bar select {
+    flex: 0 0 auto;
+    width: 110px;
+    min-width: 110px;
+}
+
+.builder-search-bar input {
+    flex: 1;
+    min-width: 0;
+}
+
 /* ---- Family Cards ---- */
 
 .family-container {
