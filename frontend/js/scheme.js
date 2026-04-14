@@ -1596,7 +1596,7 @@ const Scheme = {
 
         // Party support
         const partyVal = voter.party_support || "";
-        const knownParties = ["DMK", "ADMK+BJP", "NTK", "TVK"];
+        const knownParties = ["DMK", "AIADMK", "NTK", "TVK", "BJP", "Congress", "PMK", "DMDK", "VCK", "CPI", "MNM", "AMMK", "MDMK", "TMC(M)", "CPM", "Neutral"];
         if (knownParties.includes(partyVal)) {
             partySelect.value = partyVal;
             partyCustom.style.display = "none";
