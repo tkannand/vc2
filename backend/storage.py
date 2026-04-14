@@ -471,15 +471,16 @@ def get_voter_famcodes_for_booth(ward: str, booth: str) -> list:
     result  = []
     for entity in table.query_entities(
         f"PartitionKey eq '{pk}'",
-        select=["RowKey", "famcode", "seg_synced", "section_name", "section", "gender", "age"],
+        select=["RowKey", "famcode", "seg_synced", "section_name", "section", "gender", "age", "party_support"],
     ):
         result.append({
-            "voter_id":   entity["RowKey"],
-            "famcode":    (entity.get("famcode") or "").strip(),
-            "seg_synced": entity.get("seg_synced", "false") == "true",
-            "section":    entity.get("section_name") or entity.get("section", ""),
-            "gender":     (entity.get("gender") or "").strip().upper(),
-            "age":        entity.get("age", 0),
+            "voter_id":       entity["RowKey"],
+            "famcode":        (entity.get("famcode") or "").strip(),
+            "seg_synced":     entity.get("seg_synced", "false") == "true",
+            "party_support":  (entity.get("party_support") or "").strip(),
+            "section":        entity.get("section_name") or entity.get("section", ""),
+            "gender":         (entity.get("gender") or "").strip().upper(),
+            "age":            entity.get("age", 0),
         })
     return result
 
@@ -501,16 +502,17 @@ def get_voter_famcodes_for_ward(ward: str) -> list:
     for entity in table.query_entities(
         filter_expr,
         select=["RowKey", "PartitionKey", "famcode", "seg_synced",
-                "section_name", "section", "booth", "gender", "age"],
+                "section_name", "section", "booth", "gender", "age", "party_support"],
     ):
         result.append({
-            "voter_id":   entity["RowKey"],
-            "famcode":    (entity.get("famcode") or "").strip(),
-            "seg_synced": entity.get("seg_synced", "false") == "true",
-            "section":    entity.get("section_name") or entity.get("section", ""),
-            "booth":      entity.get("booth", ""),
-            "gender":     (entity.get("gender") or "").strip().upper(),
-            "age":        entity.get("age", 0),
+            "voter_id":       entity["RowKey"],
+            "famcode":        (entity.get("famcode") or "").strip(),
+            "seg_synced":     entity.get("seg_synced", "false") == "true",
+            "party_support":  (entity.get("party_support") or "").strip(),
+            "section":        entity.get("section_name") or entity.get("section", ""),
+            "booth":          entity.get("booth", ""),
+            "gender":         (entity.get("gender") or "").strip().upper(),
+            "age":            entity.get("age", 0),
         })
     return result
 

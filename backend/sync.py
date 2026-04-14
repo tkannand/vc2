@@ -44,10 +44,11 @@ def rebuild_dashboard_cache() -> dict:
     seg_counts: dict = {}
     booths_per_ward: dict = defaultdict(set)
     _existing = storage.get_universe_stats()
-    need_universe = not _existing or "surveyed_in_family" not in _existing
+    # "surveyed_by_party" marker forces recompute when switching from seg_synced to party_support
+    need_universe = not _existing or "surveyed_by_party" not in _existing
 
     # Fields needed for demographics (only fetched if universe stats are missing)
-    select_fields = ["PartitionKey", "ward", "booth", "seg_synced"]
+    select_fields = ["PartitionKey", "ward", "booth", "seg_synced", "party_support"]
     if need_universe:
         select_fields += ["gender", "age", "famcode", "section", "section_name"]
 
@@ -76,17 +77,18 @@ def rebuild_dashboard_cache() -> dict:
 
         if need_universe:
             total_all += 1
-            if is_seg: total_seg += 1
+            has_party = bool((entity.get("party_support") or "").strip())
+            if has_party: total_seg += 1
             g = (entity.get("gender") or "").strip().upper()
             if g in ("M", "MALE"):
                 gender_all["M"] += 1
-                if is_seg: gender_seg["M"] += 1
+                if has_party: gender_seg["M"] += 1
             elif g in ("F", "FEMALE"):
                 gender_all["F"] += 1
-                if is_seg: gender_seg["F"] += 1
+                if has_party: gender_seg["F"] += 1
             else:
                 gender_all["O"] += 1
-                if is_seg: gender_seg["O"] += 1
+                if has_party: gender_seg["O"] += 1
             try:
                 age = int(entity.get("age") or 0)
             except (ValueError, TypeError):
@@ -101,15 +103,15 @@ def rebuild_dashboard_cache() -> dict:
             if fc:
                 fk = f"{ward_raw}__{booth_raw}__{fc}"
                 all_famcodes.add(fk)
-                if is_seg:
+                if has_party:
                     surveyed_in_family += 1
                     surveyed_famcodes.add(fk)
                 else:
                     not_surv_in_family += 1
                     not_surv_famcodes.add(fk)
             else:
-                if is_seg: surveyed_ungrouped += 1
-                else:      not_surv_ungrouped += 1
+                if has_party: surveyed_ungrouped += 1
+                else:         not_surv_ungrouped += 1
             section = (entity.get("section_name") or entity.get("section") or "").strip()
             if section:
                 all_sections.add((ward_raw, booth_raw, section))
@@ -143,6 +145,7 @@ def rebuild_dashboard_cache() -> dict:
                 {"bucket": "46-60", "count": age_buckets["46_60"]},
                 {"bucket": "61+",   "count": age_buckets["61_plus"]},
             ],
+            "surveyed_by_party": True,
         }
 
     storage.store_dashboard_cache(voter_counts, wards_list, booths_dict, seg_counts, universe=universe)
@@ -212,11 +215,11 @@ def sync_voter_data_once() -> dict:
         _needs_rebuild = (
             not storage.get_setting("cached_wards") or
             not _universe or
-            "surveyed_in_family" not in _universe
+            "surveyed_by_party" not in _universe
         )
         logger.info("universe_stats_check",
                     exists=bool(_universe),
-                    has_detail="surveyed_in_family" in _universe if _universe else False,
+                    has_detail="surveyed_by_party" in _universe if _universe else False,
                     keys=list(_universe.keys()) if _universe else [])
         if _needs_rebuild:
             logger.info("dashboard_cache_or_universe_missing_rebuilding")
@@ -500,23 +503,23 @@ def sync_voter_data_once() -> dict:
     not_surv_ungrouped   = 0   # not surveyed + no famcode
 
     for v in batch:
-        is_seg = v.get("seg_synced") == "true"
-        if is_seg:
+        has_party = bool((v.get("party_support") or "").strip())
+        if has_party:
             total_surveyed += 1
 
         # Gender
         g = (v.get("gender") or "").strip().upper()
         if g in ("M", "MALE"):
             gender_all["M"] += 1
-            if is_seg:
+            if has_party:
                 gender_seg["M"] += 1
         elif g in ("F", "FEMALE"):
             gender_all["F"] += 1
-            if is_seg:
+            if has_party:
                 gender_seg["F"] += 1
         else:
             gender_all["O"] += 1
-            if is_seg:
+            if has_party:
                 gender_seg["O"] += 1
 
         # Age
@@ -536,19 +539,19 @@ def sync_voter_data_once() -> dict:
             else:
                 age_buckets["61_plus"] += 1
 
-        # Families — split by surveyed status
+        # Families — split by surveyed (has party support) status
         fc = (v.get("famcode") or "").strip()
         if fc:
             fk = f"{v.get('ward', '')}__{v.get('booth', '')}__{fc}"
             all_famcodes.add(fk)
-            if is_seg:
+            if has_party:
                 surveyed_in_family += 1
                 surveyed_famcodes.add(fk)
             else:
                 not_surv_in_family += 1
                 not_surv_famcodes.add(fk)
         else:
-            if is_seg:
+            if has_party:
                 surveyed_ungrouped += 1
             else:
                 not_surv_ungrouped += 1
@@ -582,6 +585,7 @@ def sync_voter_data_once() -> dict:
             {"bucket": "46-60", "count": age_buckets["46_60"]},
             {"bucket": "61+",   "count": age_buckets["61_plus"]},
         ],
+        "surveyed_by_party": True,
     }
     storage.store_dashboard_cache(voter_counts, wards_list, booths_dict, seg_counts, universe=universe)
 

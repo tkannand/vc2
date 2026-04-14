@@ -686,7 +686,7 @@ const Admin = {
 
         const fmt = (n) => {
             if (n == null) return "—";
-            return n >= 1000 ? (n / 1000).toFixed(1) + "K" : String(n);
+            return Number(n).toLocaleString("en-IN");
         };
         const pc = (a, b) => b > 0 ? Math.round(a * 100 / b) + "%" : "—";
 
@@ -835,7 +835,7 @@ const Admin = {
                             label: (item) => {
                                 const v = item.raw;
                                 const pct = total > 0 ? Math.round(v * 100 / total) : 0;
-                                const fmt = v >= 1000 ? (v / 1000).toFixed(1) + "K" : v;
+                                const fmt = Number(v).toLocaleString("en-IN");
                                 return `${fmt} voters (${pct}%)`;
                             },
                         },
@@ -866,7 +866,7 @@ const Admin = {
         const p = schemes.coupon  || {};
         const custom = schemes.custom || [];
 
-        const fmt = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + "K" : (v || 0));
+        const fmt = (v) => Number(v || 0).toLocaleString("en-IN");
 
         const makeCard = (icon, label, done, total, pct, pending, color, enabled) => {
             if (!enabled && enabled !== undefined) return `
@@ -1011,7 +1011,7 @@ const Admin = {
                         color: "var(--text-secondary)",
                         formatter: (_, ctx) => {
                             const total = ctx.chart.data.datasets.reduce((s, d) => s + (d.data[ctx.dataIndex] || 0), 0);
-                            return total >= 1000 ? (total / 1000).toFixed(1) + "K" : total;
+                            return Number(total).toLocaleString("en-IN");
                         },
                     },
                 },

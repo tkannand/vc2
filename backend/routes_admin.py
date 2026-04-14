@@ -598,10 +598,10 @@ async def get_summary(
     # scope_famcodes came from a single ward/booth query — compute stats directly from it
     universe_scope = None
     if scope_famcodes:
-        sif  = sum(1 for v in scope_famcodes if v["seg_synced"] and v["famcode"])
-        nsif = sum(1 for v in scope_famcodes if not v["seg_synced"] and v["famcode"])
-        sug  = sum(1 for v in scope_famcodes if v["seg_synced"] and not v["famcode"])
-        nsug = sum(1 for v in scope_famcodes if not v["seg_synced"] and not v["famcode"])
+        sif  = sum(1 for v in scope_famcodes if v["party_support"] and v["famcode"])
+        nsif = sum(1 for v in scope_famcodes if not v["party_support"] and v["famcode"])
+        sug  = sum(1 for v in scope_famcodes if v["party_support"] and not v["famcode"])
+        nsug = sum(1 for v in scope_famcodes if not v["party_support"] and not v["famcode"])
         total_fams = len(set(v["famcode"] for v in scope_famcodes if v["famcode"]))
         # Gender and age from the same projection query
         gm = sum(1 for v in scope_famcodes if v.get("gender") in ("M", "MALE"))
@@ -755,7 +755,7 @@ async def get_drill(request: Request, ward: str, booth: str = ""):
                 }
             d = demo_by_sec[section]
             d["all_voters"] += 1
-            if v.get("seg_synced") == "true":
+            if (v.get("party_support") or "").strip():
                 d["surveyed"] += 1
             gender = (v.get("gender") or "").upper()
             if gender in ("M", "MALE"):
