@@ -2605,6 +2605,7 @@ body {
 
 .vf-node {
     width: 100%;
+    flex: 1;
     border-radius: var(--radius-sm);
     padding: 10px 8px;
     text-align: center;
@@ -3669,8 +3670,10 @@ mark.search-hl {
 
 /* ── Edit person icon ── */
 .scheme-edit-person {
-    opacity: 0.35;
+    opacity: 0.4;
     transition: opacity 0.15s;
+    cursor: pointer;
+    flex-shrink: 0;
 }
 .scheme-edit-person:hover {
     opacity: 1;

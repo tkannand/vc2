@@ -556,14 +556,14 @@ const Scheme = {
 
             html += `<div class="ncc-member-row ${isDelivered ? "ncc-delivered" : ""}${m._pending ? " ncc-pending-sync" : ""}">`;
             html += `<div class="ncc-member-info">`;
-            const editPersonSvg = `<svg class="scheme-edit-person" data-voter-id="${m.voter_id}" data-booth="${this._esc(m.booth || "")}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;flex-shrink:0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+            const phoneIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
 
             // Line 1: Name + data badge + head badge + age/gender + phone last4
             const hasData = !!(m.phone_last4 || m.party_support);
             const dataBadge = hasData ? '<span class="ncc-data-badge"><svg width="16" height="16" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#22c55e"/><path d="M6.5 11.5l3 3 6-6" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' : "";
             const ageParts = [m.age, m.gender ? m.gender[0] : ""].filter(Boolean).join(" · ");
-            const phonePart = m.phone_last4 ? `<span class="ncc-name-phone">******${this._esc(m.phone_last4)}</span>` : "";
-            html += `<span class="ncc-name">${this._hl(dispName, q)}${dataBadge}${isHead ? ` <span class="member-head-badge">👑</span>` : ""}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart} ${editPersonSvg}</span>`;
+            const phonePart = m.phone_last4 ? `<span class="ncc-name-phone">${phoneIcon} ******${this._esc(m.phone_last4)}</span>` : "";
+            html += `<span class="ncc-name">${this._hl(dispName, q)}${dataBadge}${isHead ? ` <span class="member-head-badge">👑</span>` : ""}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart}</span>`;
 
             // Line 2: SL + EPIC + Relation (all merged)
             const line2 = [];
@@ -581,6 +581,9 @@ const Scheme = {
                 html += `<span class="ncc-by">by ${this._esc(m._delivered_by_name)}${atStr ? ` · ${atStr}` : ""}</span>`;
             }
             html += `</div>`; // ncc-member-info
+
+            // Edit person icon — right-aligned
+            html += `<svg class="scheme-edit-person" data-voter-id="${m.voter_id}" data-booth="${this._esc(m.booth || "")}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
 
             if (scheme.type === "individual") {
                 html += `<label class="notice-toggle">
@@ -1532,14 +1535,14 @@ const Scheme = {
 
         let html = `<div class="other-search-row ncc-other-row ${isDelivered ? "ncc-delivered" : ""}">`;
         html += `<div class="ncc-member-info">`;
-        const editOtherSvg = `<svg class="scheme-edit-person" data-voter-id="${m.voter_id}" data-booth="${this._esc(m.booth || "")}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;flex-shrink:0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+        const phoneIconO = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
 
         // Line 1: Name + data badge + age/gender + phone last4
         const hasData = !!(m.phone_last4 || m.party_support);
         const dataBadge = hasData ? '<span class="ncc-data-badge"><svg width="16" height="16" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#22c55e"/><path d="M6.5 11.5l3 3 6-6" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' : "";
         const ageParts = [m.age, m.gender ? m.gender[0] : ""].filter(Boolean).join(" · ");
-        const phonePart = m.phone_last4 ? `<span class="ncc-name-phone">******${this._esc(m.phone_last4)}</span>` : "";
-        html += `<span class="ncc-name">${this._hl(dispName, q)}${dataBadge}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart} ${editOtherSvg}</span>`;
+        const phonePart = m.phone_last4 ? `<span class="ncc-name-phone">${phoneIconO} ******${this._esc(m.phone_last4)}</span>` : "";
+        html += `<span class="ncc-name">${this._hl(dispName, q)}${dataBadge}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart}</span>`;
 
         // Line 2: SL + EPIC + Section + Relation (all merged)
         const line2 = [];
@@ -1558,6 +1561,7 @@ const Scheme = {
         html += `</div>`;
 
         html += `<div style="display:flex;gap:4px;align-items:center;">`;
+        html += `<svg class="scheme-edit-person" data-voter-id="${m.voter_id}" data-booth="${this._esc(m.booth || "")}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
         html += `<button class="btn btn-secondary btn-sm scheme-other-start-family"
             data-famcode="${this._esc(famcode)}" title="${I18n.t("add_to_family")}" style="padding:4px 8px;white-space:nowrap;">${I18n.t("add_to_family")}</button>`;
 

@@ -158,7 +158,7 @@ const Admin = {
 
             // Build scoped universe — enrich with street/booth counts from drill data
             const scopeU = data.universe_scope || {
-                total_voters:    data.schemes?.notice?.total  || 0,
+                total_voters:    data.schemes?.calling?.total || 0,
                 surveyed_voters: data.schemes?.calling?.total || 0,
             };
             // Fallback: derive street count from drill items if backend didn't include it
@@ -330,7 +330,7 @@ const Admin = {
         if (ward || booth) {
             const scopeU = data.universe_scope;
             this.renderUniverse(scopeU || {
-                total_voters:    data.schemes?.notice?.total  || 0,
+                total_voters:    data.schemes?.calling?.total || 0,
                 surveyed_voters: data.schemes?.calling?.total || 0,
                 total_families:  null,
             });

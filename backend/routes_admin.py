@@ -591,8 +591,8 @@ async def get_summary(
         )) or (1 if (booth or booth == "") else 0)
 
         universe_scope = {
-            "total_voters":       nt,
-            "surveyed_voters":    gt,
+            "total_voters":       len(scope_famcodes),
+            "surveyed_voters":    sif + sug,
             "total_families":     total_fams,
             "surveyed_in_family": sif,
             "not_surv_in_family": nsif,
