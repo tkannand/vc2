@@ -1992,9 +1992,9 @@ const Scheme = {
         const q = (document.getElementById("coupon-builder-search")?.value || "").trim();
         const resultsEl = document.getElementById("coupon-builder-search-results");
         if (!resultsEl) return;
-        if (!q || q.length < 3) {
+        if (!q || q.length < 10) {
             resultsEl.innerHTML = q.length > 0
-                ? `<div class="empty-state"><p>Type ${3 - q.length} more character${3 - q.length !== 1 ? "s" : ""}…</p></div>`
+                ? `<div class="empty-state"><p>Type ${10 - q.length} more character${10 - q.length !== 1 ? "s" : ""}…</p></div>`
                 : "";
             return;
         }
@@ -2033,14 +2033,18 @@ const Scheme = {
         // Filter by SL or name match
         const pendingIds = new Set(this._modalPending.map(v => v.voter_id));
         const qLow = q.toLowerCase();
+        const isNumeric = /^\d+$/.test(q);
         const matches = allMembers
             .filter(m => {
                 if (pendingIds.has(m.voter_id)) return false;
-                const sl     = (m.sl || "").toLowerCase();
+                if (isNumeric) {
+                    // Exact whole SL match only (e.g. "24" matches SL "24", not "249" or "124")
+                    return (m.sl || "") === q;
+                }
                 const name   = (m.name || "").toLowerCase();
                 const nameEn = (m.name_en || "").toLowerCase();
                 const nameTa = (m.name_ta || "").toLowerCase();
-                return sl.includes(qLow) || name.includes(qLow) || nameEn.includes(qLow) || nameTa.includes(qLow);
+                return name.includes(qLow) || nameEn.includes(qLow) || nameTa.includes(qLow);
             })
             .slice(0, 15);
 

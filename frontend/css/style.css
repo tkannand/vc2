@@ -1996,8 +1996,8 @@ body {
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     padding: 24px;
     width: 100%;
-    max-width: 480px;
-    max-height: 80dvh;
+    max-width: 640px;
+    max-height: 88dvh;
     overflow-y: auto;
     animation: slideUp 0.3s ease;
 }
@@ -2194,7 +2194,7 @@ body {
 
     .modal-content {
         border-radius: var(--radius-lg);
-        max-width: 440px;
+        max-width: 640px;
     }
 
     .filter-bar-logs {
