@@ -16,6 +16,8 @@
 const Scheme = {
     PAGE_SIZE: 15,
     schemes: [],   // loaded from /api/schemes
+    _lastDeliverAt: 0,
+    DELIVER_COOLDOWN_MS: 10000,
 
     // ── Booth state ────────────────────────────────────────────────
     boothMode: {
@@ -30,6 +32,7 @@ const Scheme = {
         search: "",
         otherStreet: "",
         otherSearch: "",
+        unfilledOnly: false,
     },
 
     // ── Ward state ─────────────────────────────────────────────────
@@ -45,6 +48,7 @@ const Scheme = {
         street: "",
         search: "",
         booths: [],
+        unfilledOnly: false,
     },
 
     // ── Admin state ────────────────────────────────────────────────
@@ -59,6 +63,7 @@ const Scheme = {
         ungroupedAll: [],
         ungrouped: [],
         search: "",
+        unfilledOnly: false,
     },
 
     // ── Family builder modal state ─────────────────────────────────
@@ -167,6 +172,7 @@ const Scheme = {
             ungroupedAll: [], ungrouped: [],
             page: 0, street: "", search: "",
             otherStreet: "", otherSearch: "",
+            unfilledOnly: false,
         });
 
         this._populateSchemeDropdown("booth-scheme-select", id => this._onBoothSchemeChange(id));
@@ -191,6 +197,7 @@ const Scheme = {
         Object.assign(this.boothMode, {
             scheme: schemeObj, tab: "family", page: 0,
             street: "", search: "", otherStreet: "", otherSearch: "",
+            unfilledOnly: false,
         });
 
         content.style.display = "block";
@@ -228,10 +235,10 @@ const Scheme = {
         const state = this.boothMode;
 
         state.families = this._filterFams(
-            state.familiesAll, state.street, state.search
+            state.familiesAll, state.street, state.search, state.unfilledOnly
         );
         state.ungrouped = this._filterFams(
-            state.ungroupedAll, state.otherStreet, state.otherSearch
+            state.ungroupedAll, state.otherStreet, state.otherSearch, state.unfilledOnly
         );
 
         if (state.tab === "family") this._renderBoothFamilies();
@@ -287,6 +294,9 @@ const Scheme = {
         if (street)      street.addEventListener("change", () => { this.boothMode.street      = street.value;      this.boothMode.page = 0; this._applyBoothFilters(); });
         if (otherSearch) otherSearch.addEventListener("input",  () => { this.boothMode.otherSearch = otherSearch.value; this._applyBoothFilters(); });
         if (otherStreet) otherStreet.addEventListener("change", () => { this.boothMode.otherStreet = otherStreet.value; this._applyBoothFilters(); });
+
+        this._bindUnfilledToggle("btn-booth-scheme-unfilled", this.boothMode, () => this._applyBoothFilters());
+        this._bindUnfilledToggle("btn-booth-other-unfilled", this.boothMode, () => this._applyBoothFilters());
     },
 
     _bindBoothNav() {
@@ -310,7 +320,7 @@ const Scheme = {
             familiesAll: [], families: [],
             ungroupedAll: [], ungrouped: [],
             page: 0, booth: "", street: "", search: "", otherSearch: "",
-            booths: [],
+            booths: [], unfilledOnly: false,
         });
 
         this._populateSchemeDropdown("ward-scheme-select", id => this._onWardSchemeChange(id));
@@ -334,6 +344,7 @@ const Scheme = {
         Object.assign(this.wardMode, {
             scheme: schemeObj, tab: "family", page: 0,
             booth: "", street: "", search: "", otherSearch: "",
+            unfilledOnly: false,
         });
 
         content.style.display = "block";
@@ -405,8 +416,8 @@ const Scheme = {
             ? arr.filter(f => (f.booth || f.members[0]?.booth) === state.booth)
             : arr;
 
-        state.families = this._filterFams(byBooth(state.familiesAll), state.street, state.search);
-        state.ungrouped = this._filterFams(byBooth(state.ungroupedAll), state.street, state.otherSearch);
+        state.families = this._filterFams(byBooth(state.familiesAll), state.street, state.search, state.unfilledOnly);
+        state.ungrouped = this._filterFams(byBooth(state.ungroupedAll), state.street, state.otherSearch, state.unfilledOnly);
 
         if (state.tab === "family") this._renderWardFamilies();
         else this._renderWardOther();
@@ -478,6 +489,9 @@ const Scheme = {
             this.wardMode.page = 0;
             this._applyWardFilters();
         });
+
+        this._bindUnfilledToggle("btn-ward-scheme-unfilled", this.wardMode, () => this._applyWardFilters());
+        this._bindUnfilledToggle("btn-ward-other-unfilled", this.wardMode, () => this._applyWardFilters());
     },
 
     _bindWardNav() {
@@ -544,10 +558,12 @@ const Scheme = {
             html += `<div class="ncc-member-info">`;
             const editPersonSvg = `<svg class="scheme-edit-person" data-voter-id="${m.voter_id}" data-booth="${this._esc(m.booth || "")}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;opacity:0.4;flex-shrink:0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
 
-            // Line 1: Name + head badge + age/gender + phone last4
+            // Line 1: Name + data badge + head badge + age/gender + phone last4
+            const hasData = !!(m.phone_last4 || m.party_support);
+            const dataBadge = hasData ? '<span class="ncc-data-badge">D</span>' : "";
             const ageParts = [m.age, m.gender ? m.gender[0] : ""].filter(Boolean).join(" · ");
             const phonePart = m.phone_last4 ? `<span class="ncc-name-meta">tel:${this._esc(m.phone_last4)}</span>` : "";
-            html += `<span class="ncc-name">${this._hl(dispName, q)}${isHead ? ` <span class="member-head-badge">👑</span>` : ""}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart} ${editPersonSvg}</span>`;
+            html += `<span class="ncc-name">${this._hl(dispName, q)}${dataBadge}${isHead ? ` <span class="member-head-badge">👑</span>` : ""}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart} ${editPersonSvg}</span>`;
 
             // Line 2: SL + EPIC + Relation (all merged)
             const line2 = [];
@@ -700,6 +716,17 @@ const Scheme = {
     },
 
     async _toggle(mode, voterIds, action, boothOverride = null) {
+        // 10-second cooldown between deliver actions
+        if (action === "deliver") {
+            const now = Date.now();
+            const elapsed = now - this._lastDeliverAt;
+            if (elapsed < this.DELIVER_COOLDOWN_MS) {
+                const secs = Math.ceil((this.DELIVER_COOLDOWN_MS - elapsed) / 1000);
+                App.showToast(`Please wait ${secs}s before delivering again`);
+                return;
+            }
+            this._lastDeliverAt = now;
+        }
         const state  = mode === "booth" ? this.boothMode : mode === "ward" ? this.wardMode : this.adminMode;
         const scheme = state.scheme;
         const def    = this._def(scheme.id);
@@ -934,7 +961,7 @@ const Scheme = {
         this._bindCardActions(area, mode);
     },
 
-    _filterFams(arr, street, search) {
+    _filterFams(arr, street, search, unfilledOnly) {
         let f = arr;
         if (street) f = f.filter(fam => fam.members.some(m => m.section === street));
         if (search) {
@@ -948,7 +975,25 @@ const Scheme = {
                 (m.section || "").toLowerCase().includes(q)
             ));
         }
+        if (unfilledOnly) {
+            f = f.filter(fam => fam.members.some(m => !(m.phone_last4 || m.party_support)));
+        }
         return f;
+    },
+
+    _bindUnfilledToggle(btnId, state, applyFn) {
+        const btn = this._clone(btnId);
+        if (!btn) return;
+        btn.textContent = state.unfilledOnly ? "Unfilled" : "All";
+        if (state.unfilledOnly) { btn.classList.remove("btn-secondary"); btn.classList.add("btn-primary"); }
+        btn.addEventListener("click", () => {
+            state.unfilledOnly = !state.unfilledOnly;
+            state.page = 0;
+            btn.textContent = state.unfilledOnly ? "Unfilled" : "All";
+            if (state.unfilledOnly) { btn.classList.remove("btn-secondary"); btn.classList.add("btn-primary"); }
+            else { btn.classList.remove("btn-primary"); btn.classList.add("btn-secondary"); }
+            applyFn();
+        });
     },
 
     _extractStreets(fams) {
@@ -990,6 +1035,7 @@ const Scheme = {
             familiesAll: [], families: [],
             ungroupedAll: [], ungrouped: [],
             page: 0, search: "", otherSearch: "",
+            unfilledOnly: false,
         });
 
         // Hide ward + booth rows until scheme is picked
@@ -1133,8 +1179,8 @@ const Scheme = {
 
     _applyAdminFilters() {
         const state = this.adminMode;
-        state.families = this._filterFams(state.familiesAll, "", state.search);
-        state.ungrouped = this._filterFams(state.ungroupedAll, "", state.otherSearch);
+        state.families = this._filterFams(state.familiesAll, "", state.search, state.unfilledOnly);
+        state.ungrouped = this._filterFams(state.ungroupedAll, "", state.otherSearch, state.unfilledOnly);
         if (state.tab === "family") this._renderAdminFamilies();
         else this._renderAdminOther();
         this._refreshSummary("admin");
@@ -1199,6 +1245,9 @@ const Scheme = {
             this.adminMode.otherSearch = otherSearch.value;
             this._applyAdminFilters();
         });
+
+        this._bindUnfilledToggle("btn-admin-scheme-unfilled", this.adminMode, () => this._applyAdminFilters());
+        this._bindUnfilledToggle("btn-admin-other-unfilled", this.adminMode, () => this._applyAdminFilters());
     },
 
     _bindAdminNav() {
@@ -1485,10 +1534,12 @@ const Scheme = {
         html += `<div class="ncc-member-info">`;
         const editOtherSvg = `<svg class="scheme-edit-person" data-voter-id="${m.voter_id}" data-booth="${this._esc(m.booth || "")}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer;opacity:0.4;flex-shrink:0;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
 
-        // Line 1: Name + age/gender + phone last4
+        // Line 1: Name + data badge + age/gender + phone last4
+        const hasData = !!(m.phone_last4 || m.party_support);
+        const dataBadge = hasData ? '<span class="ncc-data-badge">D</span>' : "";
         const ageParts = [m.age, m.gender ? m.gender[0] : ""].filter(Boolean).join(" · ");
         const phonePart = m.phone_last4 ? `<span class="ncc-name-meta">tel:${this._esc(m.phone_last4)}</span>` : "";
-        html += `<span class="ncc-name">${this._hl(dispName, q)}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart} ${editOtherSvg}</span>`;
+        html += `<span class="ncc-name">${this._hl(dispName, q)}${dataBadge}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart} ${editOtherSvg}</span>`;
 
         // Line 2: SL + EPIC + Section + Relation (all merged)
         const line2 = [];
@@ -1768,16 +1819,23 @@ const Scheme = {
                 // Update local state so party_support shows on re-render
                 const state = mode === "booth" ? this.boothMode : mode === "ward" ? this.wardMode : this.adminMode;
                 const allFams = [...(state.familiesAll || []), ...(state.ungroupedAll || [])];
+                const newPhoneLast4 = phones.length > 0 ? phones[0].slice(-4) : "";
                 for (const fam of allFams) {
                     for (const m of fam.members) {
                         if (m.voter_id === voterId) {
                             m.party_support = partySupport;
+                            if (newPhoneLast4) m.phone_last4 = newPhoneLast4;
                             break;
                         }
                     }
                 }
                 App.showToast(I18n.t("person_updated"));
                 modal.style.display = "none";
+                // Re-render to update D badge immediately
+                const applyFn = mode === "booth" ? () => this._applyBoothFilters()
+                    : mode === "ward" ? () => this._applyWardFilters()
+                    : () => this._applyAdminFilters();
+                applyFn();
             } else {
                 errorDiv.textContent = (res && res.detail) || I18n.t("error");
                 errorDiv.style.display = "block";

@@ -1,0 +1,12 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - generic:
+      - generic: Connect
+      - generic: Loading...
+  - main [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: Connect
+      - heading "Choose your preferred language" [level=2] [ref=e7]
+      - generic [ref=e8]:
+        - button "English" [ref=e9] [cursor=pointer]
+        - button "தமிழ்" [ref=e10] [cursor=pointer]

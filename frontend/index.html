@@ -522,8 +522,9 @@
                         </div>
                         <!-- Family panel -->
                         <div id="booth-scheme-family-panel">
-                            <div class="filter-bar">
-                                <input id="booth-scheme-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search name, SL or EPIC…" autocomplete="off"/>
+                            <div class="filter-bar" style="display:flex;gap:8px;">
+                                <input id="booth-scheme-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search name, SL or EPIC…" autocomplete="off" style="flex:1;"/>
+                                <button id="btn-booth-scheme-unfilled" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 12px;">All</button>
                             </div>
                             <div class="filter-bar">
                                 <select id="booth-scheme-street" class="select-field"><option value="" data-i18n="all_streets">All Streets</option></select>
@@ -539,9 +540,10 @@
                         </div>
                         <!-- Other panel -->
                         <div id="booth-scheme-other-panel" style="display:none;">
-                            <div class="filter-bar" style="gap:6px;">
+                            <div class="filter-bar" style="display:flex;gap:6px;">
                                 <select id="booth-scheme-other-street" class="select-field"><option value="" data-i18n="all_streets">All Streets</option></select>
                                 <input id="booth-scheme-other-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search…" autocomplete="off" style="flex:1.5;"/>
+                                <button id="btn-booth-other-unfilled" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 12px;">All</button>
                             </div>
                             <div id="booth-scheme-other-summary" class="notice-summary-bar"></div>
                             <div id="booth-scheme-other-area"></div>
@@ -630,7 +632,7 @@
                     <!-- Party support -->
                     <div style="margin-bottom:12px;">
                         <div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px;" data-i18n="party_support_label">Party Support</div>
-                        <select id="edit-person-party" class="select-field" size="4" style="width:100%;margin-bottom:6px;">
+                        <select id="edit-person-party" class="select-field" style="width:100%;margin-bottom:6px;">
                             <option value="">-- Select Party --</option>
                             <option value="DMK">DMK</option>
                             <option value="AIADMK">AIADMK</option>
@@ -690,8 +692,9 @@
                         </div>
                         <!-- Family panel -->
                         <div id="ward-scheme-family-panel">
-                            <div class="filter-bar">
-                                <input id="ward-scheme-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search name, SL or EPIC…" autocomplete="off"/>
+                            <div class="filter-bar" style="display:flex;gap:8px;">
+                                <input id="ward-scheme-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search name, SL or EPIC…" autocomplete="off" style="flex:1;"/>
+                                <button id="btn-ward-scheme-unfilled" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 12px;">All</button>
                             </div>
                             <div id="ward-scheme-family-summary" class="notice-summary-bar"></div>
                             <div id="ward-scheme-family-area"></div>
@@ -704,8 +707,9 @@
                         </div>
                         <!-- Other panel -->
                         <div id="ward-scheme-other-panel" style="display:none;">
-                            <div class="filter-bar">
-                                <input id="ward-scheme-other-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search…" autocomplete="off"/>
+                            <div class="filter-bar" style="display:flex;gap:8px;">
+                                <input id="ward-scheme-other-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search…" autocomplete="off" style="flex:1;"/>
+                                <button id="btn-ward-other-unfilled" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 12px;">All</button>
                             </div>
                             <div id="ward-scheme-other-summary" class="notice-summary-bar"></div>
                             <div id="ward-scheme-other-area"></div>
@@ -762,8 +766,9 @@
                         </div>
                         <!-- Family panel -->
                         <div id="admin-scheme-family-panel">
-                            <div class="filter-bar">
-                                <input id="admin-scheme-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search name, SL or EPIC…" autocomplete="off"/>
+                            <div class="filter-bar" style="display:flex;gap:8px;">
+                                <input id="admin-scheme-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search name, SL or EPIC…" autocomplete="off" style="flex:1;"/>
+                                <button id="btn-admin-scheme-unfilled" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 12px;">All</button>
                             </div>
                             <div id="admin-scheme-family-summary" class="notice-summary-bar"></div>
                             <div id="admin-scheme-family-area"></div>
@@ -778,8 +783,9 @@
                         </div>
                         <!-- Other panel -->
                         <div id="admin-scheme-other-panel" style="display:none;">
-                            <div class="filter-bar">
-                                <input id="admin-scheme-other-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search…" autocomplete="off"/>
+                            <div class="filter-bar" style="display:flex;gap:8px;">
+                                <input id="admin-scheme-other-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search…" autocomplete="off" style="flex:1;"/>
+                                <button id="btn-admin-other-unfilled" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 12px;">All</button>
                             </div>
                             <div id="admin-scheme-other-summary" class="notice-summary-bar"></div>
                             <div id="admin-scheme-other-area"></div>

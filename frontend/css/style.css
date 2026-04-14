@@ -491,6 +491,21 @@ body {
     font-weight: 400;
     color: var(--text-muted);
 }
+.ncc-data-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #fff;
+    background: var(--success);
+    border-radius: 4px;
+    flex-shrink: 0;
+    vertical-align: middle;
+    margin-left: 2px;
+}
 .ncc-name-done {
     text-decoration: line-through;
     color: var(--text-muted);

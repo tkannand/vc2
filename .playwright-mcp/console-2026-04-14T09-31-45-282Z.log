@@ -1,0 +1,12 @@
+[    1437ms] [LOG] [App] start @ http://localhost:8000/js/app.js:38
+[    1439ms] [LOG] [App] i18n init... @ http://localhost:8000/js/app.js:40
+[    1453ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:8000/:0
+[    1456ms] [LOG] [App] i18n done @ http://localhost:8000/js/app.js:42
+[    1458ms] [LOG] [App] NoticeQueue init... @ http://localhost:8000/js/app.js:45
+[    1459ms] [LOG] [App] NoticeQueue done @ http://localhost:8000/js/app.js:48
+[    1459ms] [LOG] [App] getMe... @ http://localhost:8000/js/app.js:51
+[    1467ms] [LOG] [App] getMe done false @ http://localhost:8000/js/app.js:53
+[    1468ms] [LOG] [App] showAuthFlow @ http://localhost:8000/js/app.js:61
+[    1468ms] [LOG] [App] hideLoading done @ http://localhost:8000/js/app.js:66
+[  124776ms] [ERROR] Failed to load resource: the server responded with a status of 530 (<none>) @ https://artist-pmid-series-casino.trycloudflare.com/:0
+[  125388ms] [ERROR] Failed to load resource: the server responded with a status of 530 (<none>) @ https://artist-pmid-series-casino.trycloudflare.com/favicon.ico:0

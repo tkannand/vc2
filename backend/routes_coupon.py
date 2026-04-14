@@ -66,6 +66,7 @@ def sanitize_coupon_voter(voter: dict) -> dict:
         "sl":               voter.get("sl", ""),
         "booth":            voter.get("booth", ""),
         "phone_last4":      _get_phone_last4(voter),
+        "party_support":    voter.get("party_support", ""),
     }
 
 

@@ -11,7 +11,13 @@
       "Bash(grep -l \"scheme\" \"/c/Users/ABCOM/Documents/app/connect/backend/\"*.py)",
       "Bash(powershell:*)",
       "Bash(grep:*)",
-      "Bash(curl -s http://127.0.0.1:8000/api/auth/me)"
+      "Bash(curl -s http://127.0.0.1:8000/api/auth/me)",
+      "Bash(git add backend/translations.py frontend/css/style.css frontend/index.html frontend/js/coupon.js frontend/js/scheme.js frontend/sw.js)",
+      "Bash(git commit:*)",
+      "Bash(git push origin master)",
+      "Bash(git add backend/routes_coupon.py frontend/css/style.css frontend/js/scheme.js frontend/sw.js backend/models.py backend/routes_booth.py backend/routes_ward.py backend/storage.py backend/translations.py frontend/index.html frontend/js/api.js)",
+      "Bash(git add frontend/index.html frontend/js/scheme.js frontend/sw.js)",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot"
     ]
   }
 }
