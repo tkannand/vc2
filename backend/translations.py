@@ -959,6 +959,10 @@ TRANSLATIONS = {
         "en": "Phone Numbers",
         "ta": "தொலைபேசி எண்கள்"
     },
+    "phone_submission": {
+        "en": "Telephone Submission",
+        "ta": "தொலைபேசி சமர்ப்பிப்பு"
+    },
     "add_phone": {
         "en": "+ Add Phone",
         "ta": "+ எண் சேர்"

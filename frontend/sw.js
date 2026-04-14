@@ -1,4 +1,4 @@
-const CACHE_NAME = "vc-v196";
+const CACHE_NAME = "vc-v202";
 const STATIC_ASSETS = [
     "/",
     "/css/style.css",
@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
     "/js/telecaller.js",
     "/js/i18n.js",
     "/js/timer.js",
+    "/js/accessibility.js",
     "/manifest.json",
 ];
 

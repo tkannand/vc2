@@ -56,6 +56,14 @@ html {
     -webkit-tap-highlight-color: transparent;
 }
 
+html.font-size-large {
+    font-size: 19.2px;
+}
+
+html.font-size-xlarge {
+    font-size: 22.4px;
+}
+
 body {
     font-family: var(--font);
     background: var(--bg);
@@ -332,6 +340,29 @@ body {
 }
 .edit-member-row .ncc-name { flex: 1; }
 
+.scheme-modal-head-toggle {
+    background: none;
+    border: none;
+    font-size: 0.85rem;
+    padding: 2px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0.25;
+    transition: opacity 0.15s, background 0.15s;
+    flex-shrink: 0;
+}
+.scheme-modal-head-toggle:hover {
+    opacity: 0.6;
+    background: #fef9c3;
+}
+.scheme-modal-head-active {
+    opacity: 1;
+    background: #fef08a;
+}
+.scheme-modal-head-active:hover {
+    background: #fde047;
+}
+
 .other-search-row {
     display: flex;
     align-items: center;
@@ -470,7 +501,7 @@ body {
 }
 .ncc-sl {
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--text-primary);
     font-weight: 600;
 }
 .ncc-epic {
@@ -491,6 +522,12 @@ body {
     font-size: 0.8rem;
     font-weight: 400;
     color: var(--text-muted);
+}
+.ncc-name-phone {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.5px;
 }
 .ncc-data-badge {
     display: inline-flex;
@@ -554,7 +591,7 @@ body {
 
 .ncc-meta {
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--text-primary);
 }
 
 .ncc-delivered.ncc-member-row { background: var(--success-light); }
@@ -3640,4 +3677,59 @@ mark.search-hl {
 }
 .edit-person-phone-row input {
     padding: 6px 10px;
+}
+
+/* ============================================
+   Accessibility - Font Size Toggle
+   ============================================ */
+
+.btn-font-size-toggle {
+    position: fixed;
+    bottom: calc(var(--nav-h) + 20px);
+    right: 20px;
+    z-index: 500;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.85);
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    transition: background 0.2s ease, transform 0.15s ease, border-color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.btn-font-size-toggle:hover {
+    background: rgba(15, 23, 42, 0.95);
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+.btn-font-size-toggle:active {
+    transform: scale(0.92);
+}
+
+.btn-font-size-toggle svg {
+    width: 22px;
+    height: 22px;
+}
+
+.font-size-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 10px;
+    min-width: 22px;
+    text-align: center;
+    line-height: 1.3;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    pointer-events: none;
 }

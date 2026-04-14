@@ -562,7 +562,7 @@ const Scheme = {
             const hasData = !!(m.phone_last4 || m.party_support);
             const dataBadge = hasData ? '<span class="ncc-data-badge"><svg width="16" height="16" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#22c55e"/><path d="M6.5 11.5l3 3 6-6" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' : "";
             const ageParts = [m.age, m.gender ? m.gender[0] : ""].filter(Boolean).join(" · ");
-            const phonePart = m.phone_last4 ? `<span class="ncc-name-meta">tel:${this._esc(m.phone_last4)}</span>` : "";
+            const phonePart = m.phone_last4 ? `<span class="ncc-name-phone">******${this._esc(m.phone_last4)}</span>` : "";
             html += `<span class="ncc-name">${this._hl(dispName, q)}${dataBadge}${isHead ? ` <span class="member-head-badge">👑</span>` : ""}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart} ${editPersonSvg}</span>`;
 
             // Line 2: SL + EPIC + Relation (all merged)
@@ -1538,7 +1538,7 @@ const Scheme = {
         const hasData = !!(m.phone_last4 || m.party_support);
         const dataBadge = hasData ? '<span class="ncc-data-badge"><svg width="16" height="16" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#22c55e"/><path d="M6.5 11.5l3 3 6-6" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' : "";
         const ageParts = [m.age, m.gender ? m.gender[0] : ""].filter(Boolean).join(" · ");
-        const phonePart = m.phone_last4 ? `<span class="ncc-name-meta">tel:${this._esc(m.phone_last4)}</span>` : "";
+        const phonePart = m.phone_last4 ? `<span class="ncc-name-phone">******${this._esc(m.phone_last4)}</span>` : "";
         html += `<span class="ncc-name">${this._hl(dispName, q)}${dataBadge}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart} ${editOtherSvg}</span>`;
 
         // Line 2: SL + EPIC + Section + Relation (all merged)
@@ -1628,22 +1628,20 @@ const Scheme = {
 
         // Fetch decrypted phones
         phonesDiv.innerHTML = `<div style="font-size:0.75rem;color:var(--text-muted);">${I18n.t("loading")}</div>`;
-        let phones = [];
+        this._editPersonExistingPhones = [];
+        this._editPersonNewPhones = [];
         try {
             const revealFn = mode === "booth" ? API.revealPhone : API.wardRevealPhone;
             const res = await revealFn.call(API, ward, memberBooth, voterId);
             if (res && !res.error && res.phones) {
-                phones = res.phones.map(p => p.number).filter(Boolean);
+                this._editPersonExistingPhones = res.phones.map(p => p.number).filter(Boolean);
             }
         } catch (e) {
             console.log("edit_person_reveal_error", e);
         }
 
-        // Store original count for read-only logic (> 2 existing = read-only)
-        this._editPersonOriginalPhoneCount = phones.length;
-
-        // Render phone inputs
-        this._renderEditPersonPhones(phones);
+        // Render phone display
+        this._renderEditPersonPhones();
 
         // Party support
         const partyVal = voter.party_support || "";
@@ -1669,46 +1667,53 @@ const Scheme = {
         this._bindEditPersonEvents();
     },
 
-    _renderEditPersonPhones(phones) {
+    _renderEditPersonPhones() {
         const phonesDiv = document.getElementById("edit-person-phones");
-        if (!phones || phones.length === 0) {
-            phonesDiv.innerHTML = `<div style="font-size:0.75rem;color:var(--text-muted);">${I18n.t("no_phones")}</div>`;
-            return;
-        }
-        const origCount = this._editPersonOriginalPhoneCount || 0;
-        const readOnlyMode = origCount > 2;
+        const existing = this._editPersonExistingPhones || [];
+        const newPhones = this._editPersonNewPhones || [];
         let html = "";
-        phones.forEach((phone, i) => {
-            const isExisting = readOnlyMode && i < origCount;
-            if (isExisting) {
-                // Read-only display for existing phones when > 2
-                html += `<div class="edit-person-phone-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
-                    <div class="select-field" style="flex:1;font-size:0.85rem;background:var(--bg);color:var(--text-secondary);cursor:default;">${this._esc(phone)}</div>
-                    <input type="hidden" class="edit-person-phone-input" value="${this._esc(phone)}" />
-                </div>`;
-            } else {
-                // Editable input for new phones or when <= 2 existing
-                html += `<div class="edit-person-phone-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
-                    <input type="tel" class="select-field edit-person-phone-input" value="${this._esc(phone)}" maxlength="10" pattern="[0-9]{10}" placeholder="10 digit number" style="flex:1;font-size:0.85rem;" />
-                    <button class="btn btn-secondary btn-sm edit-person-phone-remove" data-index="${i}" style="padding:4px 8px;font-size:0.7rem;color:var(--danger);">x</button>
-                </div>`;
-            }
+
+        // Existing phones — masked, read-only
+        existing.forEach(phone => {
+            const masked = "******" + phone.slice(-4);
+            html += `<div class="edit-person-phone-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
+                <div class="select-field" style="flex:1;font-size:0.85rem;background:var(--bg);color:var(--text-primary);cursor:default;letter-spacing:1px;">${this._esc(masked)}</div>
+            </div>`;
         });
+
+        // New phones — editable inputs
+        newPhones.forEach((phone, i) => {
+            html += `<div class="edit-person-phone-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
+                <input type="tel" class="select-field edit-person-new-phone" value="${this._esc(phone)}" maxlength="10" pattern="[0-9]{10}" placeholder="10 digit number" style="flex:1;font-size:0.85rem;" data-index="${i}" />
+                <button class="btn btn-secondary btn-sm edit-person-phone-remove" data-index="${i}" style="padding:4px 8px;font-size:0.7rem;color:var(--danger);">x</button>
+            </div>`;
+        });
+
+        if (!existing.length && !newPhones.length) {
+            html = `<div style="font-size:0.75rem;color:var(--text-muted);">${I18n.t("no_phones")}</div>`;
+        }
+
         phonesDiv.innerHTML = html;
 
-        // Bind remove buttons (only exist on editable rows)
+        // Sync new phone input values back on change
+        phonesDiv.querySelectorAll(".edit-person-new-phone").forEach(inp => {
+            inp.addEventListener("input", () => {
+                this._editPersonNewPhones[parseInt(inp.dataset.index)] = inp.value.trim();
+            });
+        });
+
+        // Remove new phone
         phonesDiv.querySelectorAll(".edit-person-phone-remove").forEach(btn => {
             btn.addEventListener("click", () => {
-                const currentPhones = this._getEditPersonPhones();
-                currentPhones.splice(parseInt(btn.dataset.index), 1);
-                this._renderEditPersonPhones(currentPhones);
+                this._editPersonNewPhones.splice(parseInt(btn.dataset.index), 1);
+                this._renderEditPersonPhones();
             });
         });
     },
 
-    _getEditPersonPhones() {
-        const inputs = document.querySelectorAll(".edit-person-phone-input");
-        return Array.from(inputs).map(inp => inp.value.trim()).filter(Boolean);
+    _getEditPersonAllPhones() {
+        // Existing (full numbers, kept in memory) + new phones
+        return [...(this._editPersonExistingPhones || []), ...(this._editPersonNewPhones || []).filter(Boolean)];
     },
 
     _bindEditPersonEvents() {
@@ -1752,17 +1757,17 @@ const Scheme = {
         const newAddPhone = addPhoneBtn.cloneNode(true);
         addPhoneBtn.parentNode.replaceChild(newAddPhone, addPhoneBtn);
         newAddPhone.addEventListener("click", () => {
-            const currentPhones = this._getEditPersonPhones();
-            if (currentPhones.length >= 4) {
+            const totalCount = (this._editPersonExistingPhones || []).length + (this._editPersonNewPhones || []).length;
+            if (totalCount >= 4) {
                 errorDiv.textContent = I18n.t("max_phones");
                 errorDiv.style.display = "block";
                 return;
             }
             errorDiv.style.display = "none";
-            currentPhones.push("");
-            this._renderEditPersonPhones(currentPhones);
+            this._editPersonNewPhones.push("");
+            this._renderEditPersonPhones();
             // Focus last input
-            const inputs = document.querySelectorAll(".edit-person-phone-input");
+            const inputs = document.querySelectorAll(".edit-person-new-phone");
             if (inputs.length) inputs[inputs.length - 1].focus();
         });
 
@@ -1772,8 +1777,8 @@ const Scheme = {
         newSave.addEventListener("click", async () => {
             errorDiv.style.display = "none";
 
-            // Collect phones
-            const phones = this._getEditPersonPhones();
+            // Collect phones (existing full numbers + new inputs)
+            const phones = this._getEditPersonAllPhones();
             if (phones.length > 4) {
                 errorDiv.textContent = I18n.t("max_phones");
                 errorDiv.style.display = "block";
@@ -1936,12 +1941,28 @@ const Scheme = {
             submitBtn.textContent = this._modalEditFamcode ? I18n.t("save_changes") : I18n.t("create_family");
             submitBtn.className = submitBtn.className.replace("btn-danger", "btn-primary").replace("btn-primary btn-primary", "btn-primary");
         }
-        list.innerHTML = this._modalPending.map(v => `
-            <div class="edit-member-row">
+        list.innerHTML = this._modalPending.map(v => {
+            const isHead = v.is_head === "Yes";
+            return `<div class="edit-member-row">
                 <span class="ncc-sl">${this._esc(v.sl || "")}</span>
                 <span class="ncc-name">${this._esc(v.name || v.voter_id)}</span>
+                <button class="btn btn-sm scheme-modal-head-toggle ${isHead ? "scheme-modal-head-active" : ""}"
+                    data-voter="${v.voter_id}" title="${I18n.t("head_of_family")}">👑</button>
                 <button class="btn btn-danger btn-sm btn-scheme-modal-remove" data-voter="${v.voter_id}">✕</button>
-            </div>`).join("");
+            </div>`;
+        }).join("");
+        // Head of family toggle — only one allowed
+        list.querySelectorAll(".scheme-modal-head-toggle").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const vid = btn.dataset.voter;
+                const current = this._modalPending.find(v => v.voter_id === vid);
+                const wasHead = current && current.is_head === "Yes";
+                this._modalPending.forEach(v => { v.is_head = "No"; });
+                if (!wasHead && current) current.is_head = "Yes";
+                this._renderModalPending();
+            });
+        });
+        // Remove member
         list.querySelectorAll(".btn-scheme-modal-remove").forEach(btn => {
             btn.addEventListener("click", async () => {
                 const ok = await Notice.confirmUndeliver("confirm_remove_member");
