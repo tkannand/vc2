@@ -17,7 +17,12 @@
       "Bash(git push origin master)",
       "Bash(git add backend/routes_coupon.py frontend/css/style.css frontend/js/scheme.js frontend/sw.js backend/models.py backend/routes_booth.py backend/routes_ward.py backend/storage.py backend/translations.py frontend/index.html frontend/js/api.js)",
       "Bash(git add frontend/index.html frontend/js/scheme.js frontend/sw.js)",
-      "mcp__plugin_playwright_playwright__browser_take_screenshot"
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_type",
+      "Bash(curl -s -X POST http://localhost:8001/api/auth/login-pin -H \"Content-Type: application/json\" -d '{\"\"phone\"\":\"\"8903429890\"\",\"\"pin\"\":\"\"2304\"\"}')",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaG9uZSI6Ijg5MDM0Mjk4OTAiLCJyb2xlIjoic3VwZXJhZG1pbiIsIndhcmQiOiIiLCJib290aCI6IiIsIm5hbWUiOiJZb3VyIE5hbWUiLCJleHAiOjE3NzYzMTgzODEsImlhdCI6MTc3NjIzMTk4MX0.6hVq-ENkIJBI-V6Kr4ZJSvyJ9oS-mR-cIWjXN3eKiIE\")",
+      "Bash(curl -s -b \"session_token=$TOKEN\" http://localhost:8001/api/dashboard/division-map)"
     ]
   }
 }

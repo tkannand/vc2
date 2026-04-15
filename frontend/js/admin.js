@@ -7,7 +7,7 @@ const Admin = {
     _drillWard:  "",   // currently drilled-into ward (empty = all wards)
     _drillBooth: "",   // currently drilled-into booth (empty = ward level)
     _drillItems: [],   // current geo chart data array
-    _geoScheme:  "calling",  // "calling" | "notice" | "coupon"
+    _geoScheme:  "notice",  // "calling" | "notice" | "coupon"
     _summaryData: null,      // cached summary response
     _scopeLocked: false,     // true for ward/booth — can't navigate outside their scope
 
@@ -363,8 +363,9 @@ const Admin = {
         let ct = 0, cc = 0, cda = 0, csk = 0;
         let nt = 0, nd = 0;
         let pt = 0, pd = 0;
+        let totalFamilies = 0, familiesDone = 0;
         const csTotals = {};
-        customSchemes.forEach(sc => { csTotals[sc.id] = { total: 0, done: 0, name: sc.name }; });
+        customSchemes.forEach(sc => { csTotals[sc.id] = { total: 0, done: 0, name: sc.name, type: sc.type || "family", famDone: 0 }; });
 
         for (const it of items) {
             ct  += it.total        || 0;
@@ -375,9 +376,14 @@ const Admin = {
             nd  += it.notice_delivered || 0;
             pt  += it.coupon_total     || 0;
             pd  += it.coupon_delivered || 0;
+            totalFamilies += it.families      || 0;
+            familiesDone  += it.families_done || 0;
             for (const sc of customSchemes) {
                 csTotals[sc.id].total += it[`scheme_${sc.id}_total`]     || 0;
                 csTotals[sc.id].done  += it[`scheme_${sc.id}_delivered`] || 0;
+                if (sc.type === "family") {
+                    csTotals[sc.id].famDone += it[`scheme_${sc.id}_families_done`] || 0;
+                }
             }
         }
 
@@ -396,14 +402,19 @@ const Admin = {
                 total: pt, done: pd, pending: pt - pd,
                 pct: pt > 0 ? Math.round(pd / pt * 1000) / 10 : 0,
                 enabled: couponEnabled,
+                families: totalFamilies,
+                families_done: familiesDone,
             },
             custom: customSchemes.map(sc => ({
                 id: sc.id, name: csTotals[sc.id].name,
+                type: csTotals[sc.id].type,
                 total: csTotals[sc.id].total,
                 done: csTotals[sc.id].done,
                 pending: csTotals[sc.id].total - csTotals[sc.id].done,
                 pct: csTotals[sc.id].total > 0
                     ? Math.round(csTotals[sc.id].done / csTotals[sc.id].total * 1000) / 10 : 0,
+                families: csTotals[sc.id].type === "family" ? totalFamilies : 0,
+                families_done: csTotals[sc.id].type === "family" ? csTotals[sc.id].famDone : 0,
             })),
         };
     },
@@ -866,13 +877,16 @@ const Admin = {
 
         const fmt = (v) => Number(v || 0).toLocaleString("en-IN");
 
-        const makeCard = (icon, label, done, total, pct, pending, color, enabled) => {
+        const makeCard = (icon, label, done, total, pct, pending, color, enabled, families, familiesDone) => {
             if (!enabled && enabled !== undefined) return `
                 <div class="scheme-card scheme-disabled">
                     <div class="scheme-icon">${icon}</div>
                     <div class="scheme-label">${label}</div>
                     <div class="scheme-status">Disabled</div>
                 </div>`;
+            const familyLine = families
+                ? `<div class="scheme-families">${fmt(familiesDone || 0)} / ${fmt(families)} families</div>`
+                : "";
             return `
                 <div class="scheme-card">
                     <div class="scheme-icon">${icon}</div>
@@ -883,6 +897,7 @@ const Admin = {
                         <span class="scheme-pending">${fmt(pending)} left</span>
                     </div>
                     <div class="scheme-total">of ${fmt(total)}</div>
+                    ${familyLine}
                     <div class="progress-bar-container">
                         <div class="progress-bar" style="width:${pct}%;background:${color}"></div>
                     </div>
@@ -892,12 +907,14 @@ const Admin = {
         const el = document.getElementById("admin-scheme-cards");
         if (!el) return;
         const customCards = custom.map(sc =>
-            makeCard("📦", Booth.escHtml(sc.name), sc.done, sc.total, sc.pct, sc.pending, "#8b5cf6", true)
+            makeCard("📦", Booth.escHtml(sc.name), sc.done, sc.total, sc.pct, sc.pending, "#8b5cf6", true,
+                     sc.families || 0, sc.families_done || 0)
         ).join("");
         el.innerHTML =
-            makeCard("📞", "Telecalling", c.done, c.total, c.pct, c.not_called, "#22c55e", true) +
-            makeCard("📋", "Notice Dist.", n.done, n.total, n.pct, n.pending,    "#3b82f6", n.enabled) +
-            makeCard("🎫", "Coupon Dist.", p.done, p.total, p.pct, p.pending,    "#f59e0b", p.enabled) +
+            makeCard("📞", "Telecalling", c.done, c.total, c.pct, c.not_called, "#22c55e", true, 0, 0) +
+            makeCard("📋", "Notice Dist.", n.done, n.total, n.pct, n.pending,    "#3b82f6", n.enabled, 0, 0) +
+            makeCard("🎫", "Coupon Dist.", p.done, p.total, p.pct, p.pending,    "#f59e0b", p.enabled,
+                     p.families || 0, p.families_done || 0) +
             customCards;
     },
 
@@ -923,6 +940,12 @@ const Admin = {
         });
     },
 
+    _isCustomSchemeFamily(schemeId) {
+        const customs = this._summaryData?.schemes?.custom || [];
+        const sc = customs.find(c => c.id === schemeId);
+        return sc ? (sc.type || "family") === "family" : true;
+    },
+
     _geoLabel(item) {
         if (this._drillBooth) return item.section;   // street level
         if (this._drillWard)  return item.booth_number ? `#${item.booth_number}` : item.booth;
@@ -931,90 +954,117 @@ const Admin = {
 
     _renderGeoChart(items) {
         this._drillItems = items;
-        const ctx = document.getElementById("chart-geo");
-        const wrap = ctx?.closest(".geo-chart-wrap");
-        if (!ctx) return;
+        const wrap = document.getElementById("geo-table-wrap");
+        if (!wrap) return;
+
+        // Destroy old chart if any (from before migration)
         if (this.chartGeo) { this.chartGeo.destroy(); this.chartGeo = null; }
 
         // Remove any previous empty/error overlay
-        wrap?.querySelectorAll(".geo-empty").forEach((el) => el.remove());
+        wrap.querySelectorAll(".geo-empty").forEach((el) => el.remove());
 
         if (!items.length) {
+            wrap.innerHTML = "";
             const msg = document.createElement("div");
             msg.className = "geo-empty";
             msg.innerHTML = "<span>No data available</span>";
-            wrap?.appendChild(msg);
+            wrap.appendChild(msg);
             return;
         }
 
         const s = this._geoScheme;
-        const labels = items.map((it) => this._geoLabel(it));
+        const fmt = (v) => Number(v || 0).toLocaleString("en-IN");
+        const canDrillDown = !this._drillBooth;
 
-        let datasets;
-        if (s === "notice") {
-            datasets = [
-                { label: "Delivered", data: items.map((it) => it.notice_delivered || 0), backgroundColor: "#3b82f6", borderRadius: 4 },
-                { label: "Pending",   data: items.map((it) => (it.notice_total || 0) - (it.notice_delivered || 0)), backgroundColor: "#e2e8f0", borderRadius: 4 },
-            ];
-        } else if (s === "coupon") {
-            datasets = [
-                { label: "Delivered", data: items.map((it) => it.coupon_delivered || 0), backgroundColor: "#f59e0b", borderRadius: 4 },
-                { label: "Pending",   data: items.map((it) => (it.coupon_total || 0) - (it.coupon_delivered || 0)), backgroundColor: "#e2e8f0", borderRadius: 4 },
-            ];
-        } else if (s.startsWith("cs_")) {
-            datasets = [
-                { label: "Delivered", data: items.map((it) => it[`scheme_${s}_delivered`] || 0), backgroundColor: "#8b5cf6", borderRadius: 4 },
-                { label: "Pending",   data: items.map((it) => (it[`scheme_${s}_total`] || 0) - (it[`scheme_${s}_delivered`] || 0)), backgroundColor: "#e2e8f0", borderRadius: 4 },
-            ];
+        // Build table based on selected scheme tab
+        let headerHtml, rowsHtml;
+
+        if (s === "calling") {
+            headerHtml = `<th>Name</th><th class="num">Total</th><th class="num">Called</th><th class="num">Not Called</th><th class="num">No Answer</th><th class="num">Skipped</th><th class="num">%</th>`;
+            rowsHtml = items.map((it, idx) => {
+                const pct = it.total > 0 ? Math.round(it.called / it.total * 1000) / 10 : 0;
+                return `<tr class="${canDrillDown ? 'geo-row-click' : ''}" data-idx="${idx}">
+                    <td class="geo-row-name">${Booth.escHtml(this._geoLabel(it))}</td>
+                    <td class="num">${fmt(it.total)}</td>
+                    <td class="num geo-val-good">${fmt(it.called)}</td>
+                    <td class="num">${fmt(it.not_called)}</td>
+                    <td class="num geo-val-warn">${fmt(it.didnt_answer)}</td>
+                    <td class="num geo-val-muted">${fmt(it.skipped)}</td>
+                    <td class="num"><strong>${pct}%</strong></td>
+                </tr>`;
+            }).join("");
+        } else if (s === "notice") {
+            headerHtml = `<th>Name</th><th class="num">Total</th><th class="num">Delivered</th><th class="num">Pending</th><th class="num">%</th>`;
+            rowsHtml = items.map((it, idx) => {
+                const t = it.notice_total || 0, d = it.notice_delivered || 0;
+                const pct = t > 0 ? Math.round(d / t * 1000) / 10 : 0;
+                return `<tr class="${canDrillDown ? 'geo-row-click' : ''}" data-idx="${idx}">
+                    <td class="geo-row-name">${Booth.escHtml(this._geoLabel(it))}</td>
+                    <td class="num">${fmt(t)}</td>
+                    <td class="num geo-val-good">${fmt(d)}</td>
+                    <td class="num">${fmt(t - d)}</td>
+                    <td class="num"><strong>${pct}%</strong></td>
+                </tr>`;
+            }).join("");
+        } else if (s === "coupon" || (s.startsWith("cs_") && this._isCustomSchemeFamily(s))) {
+            // Family-based scheme: show voter + family columns
+            const isCustom = s.startsWith("cs_");
+            const tKey = isCustom ? `scheme_${s}_total` : "coupon_total";
+            const dKey = isCustom ? `scheme_${s}_delivered` : "coupon_delivered";
+            const fdKey = isCustom ? `scheme_${s}_families_done` : "families_done";
+
+            headerHtml = `<th>Name</th>
+                <th class="num">Voters</th><th class="num">V.Done</th><th class="num">V.Left</th>
+                <th class="num">Families</th><th class="num">F.Done</th><th class="num">F.Left</th>
+                <th class="num">%</th>`;
+            rowsHtml = items.map((it, idx) => {
+                const vt = it[tKey] || 0, vd = it[dKey] || 0;
+                const ft = it.families || 0, fd = it[fdKey] || 0;
+                const pct = vt > 0 ? Math.round(vd / vt * 1000) / 10 : 0;
+                return `<tr class="${canDrillDown ? 'geo-row-click' : ''}" data-idx="${idx}">
+                    <td class="geo-row-name">${Booth.escHtml(this._geoLabel(it))}</td>
+                    <td class="num">${fmt(vt)}</td>
+                    <td class="num geo-val-good">${fmt(vd)}</td>
+                    <td class="num">${fmt(vt - vd)}</td>
+                    <td class="num">${fmt(ft)}</td>
+                    <td class="num geo-val-good">${fmt(fd)}</td>
+                    <td class="num">${fmt(Math.max(0, ft - fd))}</td>
+                    <td class="num"><strong>${pct}%</strong></td>
+                </tr>`;
+            }).join("");
         } else {
-            datasets = [
-                { label: "Called",       data: items.map((it) => it.called        || 0), backgroundColor: "#22c55e", borderRadius: 4 },
-                { label: "Not Called",   data: items.map((it) => it.not_called    || 0), backgroundColor: "#94a3b8", borderRadius: 4 },
-                { label: "No Answer",    data: items.map((it) => it.didnt_answer  || 0), backgroundColor: "#ef4444", borderRadius: 4 },
-                { label: "Skipped",      data: items.map((it) => it.skipped       || 0), backgroundColor: "#f59e0b", borderRadius: 4 },
-            ];
+            // Fallback for any other scheme type (individual custom)
+            const tKey = `scheme_${s}_total`, dKey = `scheme_${s}_delivered`;
+            headerHtml = `<th>Name</th><th class="num">Total</th><th class="num">Delivered</th><th class="num">Pending</th><th class="num">%</th>`;
+            rowsHtml = items.map((it, idx) => {
+                const t = it[tKey] || 0, d = it[dKey] || 0;
+                const pct = t > 0 ? Math.round(d / t * 1000) / 10 : 0;
+                return `<tr class="${canDrillDown ? 'geo-row-click' : ''}" data-idx="${idx}">
+                    <td class="geo-row-name">${Booth.escHtml(this._geoLabel(it))}</td>
+                    <td class="num">${fmt(t)}</td>
+                    <td class="num geo-val-good">${fmt(d)}</td>
+                    <td class="num">${fmt(t - d)}</td>
+                    <td class="num"><strong>${pct}%</strong></td>
+                </tr>`;
+            }).join("");
         }
 
-        const canDrillDown = !this._drillBooth; // can't drill further than booth level
-        this.chartGeo = new Chart(ctx, {
-            type: "bar",
-            data: { labels, datasets },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                onClick: canDrillDown ? (evt, els) => {
-                    if (!els.length) return;
-                    const idx = els[0].index;
-                    this._onGeoBarClick(items[idx]);
-                } : undefined,
-                scales: {
-                    x: { stacked: true, grid: { display: false }, ticks: { font: { family: "DM Sans", size: 10 }, maxRotation: 30 } },
-                    y: { stacked: true, grid: { color: "rgba(0,0,0,0.05)" }, ticks: { font: { family: "DM Sans", size: 9 }, callback: (v) => v >= 1000 ? (v/1000).toFixed(0)+"K" : v } },
-                },
-                plugins: {
-                    legend: { position: "bottom", labels: { font: { family: "DM Sans", size: 10 }, padding: 8, usePointStyle: true, pointStyleWidth: 6 } },
-                    tooltip: { callbacks: { title: (items) => items[0]?.label || "" } },
-                    datalabels: {
-                        display: (ctx) => {
-                            // Show label only on the top (last stacked) dataset and only if value > 0
-                            const ds = ctx.chart.data.datasets;
-                            const isLast = ctx.datasetIndex === ds.length - 1;
-                            const total = ds.reduce((s, d) => s + (d.data[ctx.dataIndex] || 0), 0);
-                            return isLast && total > 0;
-                        },
-                        anchor: "end",
-                        align: "end",
-                        offset: 2,
-                        font: { family: "DM Sans", size: 9, weight: "600" },
-                        color: "var(--text-secondary)",
-                        formatter: (_, ctx) => {
-                            const total = ctx.chart.data.datasets.reduce((s, d) => s + (d.data[ctx.dataIndex] || 0), 0);
-                            return Number(total).toLocaleString("en-IN");
-                        },
-                    },
-                },
-            },
-        });
+        wrap.innerHTML = `<div class="geo-table-scroll">
+            <table class="geo-table">
+                <thead><tr>${headerHtml}</tr></thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+        </div>`;
+
+        // Bind drill-down click on rows
+        if (canDrillDown) {
+            wrap.querySelectorAll(".geo-row-click").forEach((row) => {
+                row.addEventListener("click", () => {
+                    const idx = parseInt(row.dataset.idx, 10);
+                    if (!isNaN(idx) && items[idx]) this._onGeoBarClick(items[idx]);
+                });
+            });
+        }
 
         const hint = document.getElementById("admin-geo-hint");
         if (hint) hint.style.display = canDrillDown ? "block" : "none";
@@ -1227,6 +1277,8 @@ const Admin = {
             }
 
             // Checkbox for non-superadmin
+            const escWard = (u.ward || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+            const escBooth = (u.booth || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
             const checkbox = u.role !== "superadmin"
                 ? `<div class="user-row-check"><input type="checkbox" class="chk-user" data-phone="${u.phone}"></div>`
                 : "";
@@ -1246,8 +1298,8 @@ const Admin = {
                 </div>
                 ${u.role !== "superadmin" ? `
                 <div class="user-row-actions">
-                    <button class="btn-edit btn btn-secondary btn-sm" data-phone="${u.phone}">${I18n.t("edit")}</button>
-                    <button class="btn-remove btn btn-danger btn-sm" data-phone="${u.phone}" data-role="${u.role}">${I18n.t("remove")}</button>
+                    <button class="btn-edit btn btn-secondary btn-sm" data-phone="${u.phone}" data-role="${u.role}" data-ward="${escWard}" data-booth="${escBooth}">${I18n.t("edit")}</button>
+                    <button class="btn-remove btn btn-danger btn-sm" data-phone="${u.phone}" data-role="${u.role}" data-ward="${escWard}" data-booth="${escBooth}">${I18n.t("remove")}</button>
                 </div>` : ""}
             </div>`;
         }).join("");
@@ -1255,7 +1307,13 @@ const Admin = {
         // Bind edit/remove on the new rows
         temp.querySelectorAll(".btn-edit").forEach((btn) => {
             btn.addEventListener("click", () => {
-                const user = (this.allUsers || []).find(u => u.phone === btn.dataset.phone);
+                // Match the specific assignment by phone + role + ward + booth
+                const user = (this.allUsers || []).find(u =>
+                    u.phone === btn.dataset.phone
+                    && u.role === btn.dataset.role
+                    && (u.ward || "") === (btn.dataset.ward || "")
+                    && (u.booth || "") === (btn.dataset.booth || "")
+                );
                 if (user) this.openEditUser(user);
             });
         });
@@ -1263,7 +1321,7 @@ const Admin = {
             btn.addEventListener("click", async () => {
                 if (!confirm(I18n.t("confirm_remove_user"))) return;
                 App.setBtnLoading(btn, true);
-                const result = await API.removeUser(btn.dataset.phone);
+                const result = await API.removeUser(btn.dataset.phone, btn.dataset.role, btn.dataset.ward, btn.dataset.booth);
                 App.setBtnLoading(btn, false);
                 if (result.success) {
                     App.showToast(I18n.t("user_removed"));
@@ -1330,9 +1388,15 @@ const Admin = {
     },
 
     _editingPhone: null,
+    _editingOldRole: "",
+    _editingOldWard: "",
+    _editingOldBooth: "",
 
     async openAddUser() {
         this._editingPhone = null;
+        this._editingOldRole = "";
+        this._editingOldWard = "";
+        this._editingOldBooth = "";
         document.getElementById("modal-add-user").style.display = "flex";
         document.getElementById("new-user-phone").value = "";
         document.getElementById("new-user-phone").disabled = false;
@@ -1355,6 +1419,9 @@ const Admin = {
 
     async openEditUser(user) {
         this._editingPhone = user.phone;
+        this._editingOldRole = user.role || "";
+        this._editingOldWard = user.ward || "";
+        this._editingOldBooth = user.booth || "";
         document.getElementById("modal-add-user").style.display = "flex";
         document.getElementById("add-user-error").textContent = "";
         const modalTitle = document.querySelector("#modal-add-user h3");
@@ -1512,7 +1579,7 @@ const Admin = {
 
         const payload = { phone, name, role, ward: ward || "", booth: booth || "" };
         const result = this._editingPhone
-            ? await API.updateUser(this._editingPhone, payload)
+            ? await API.updateUser(this._editingPhone, payload, this._editingOldRole, this._editingOldWard, this._editingOldBooth)
             : await API.addUser(payload);
 
         if (result.error) {

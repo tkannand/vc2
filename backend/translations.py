@@ -936,8 +936,8 @@ TRANSLATIONS = {
         "ta": "சாவடி தெரியவில்லை — முதலில் சாவடி தேர்வு செய்யவும்"
     },
     "search_placeholder": {
-        "en": "Search name, SL or EPIC…",
-        "ta": "பெயர், வரிசை அல்லது EPIC தேடு…"
+        "en": "Search name, SL, EPIC or House No…",
+        "ta": "பெயர், வரிசை, EPIC அல்லது வீட்டு எண் தேடு…"
     },
     "family_head": {
         "en": "Head",

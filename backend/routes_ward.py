@@ -48,7 +48,7 @@ async def get_ward_stats(request: Request, ward: str):
 
     workers = storage.get_worker_activity_summary(ward=ward)
     users = storage.get_users_for_ward(ward)
-    user_map = {u["RowKey"]: u.get("name", u["RowKey"]) for u in users}
+    user_map = {storage._phone_from_row_key(u["RowKey"]): u.get("name", storage._phone_from_row_key(u["RowKey"])) for u in users}
     for w in workers:
         w["name"] = user_map.get(w["phone"], w["phone"][-4:])
 
@@ -72,7 +72,7 @@ async def get_leaderboard(request: Request, ward: str):
 
     workers = storage.get_worker_activity_summary(ward=ward)
     users = storage.get_users_for_ward(ward)
-    user_map = {u["RowKey"]: u.get("name", u["RowKey"]) for u in users}
+    user_map = {storage._phone_from_row_key(u["RowKey"]): u.get("name", storage._phone_from_row_key(u["RowKey"])) for u in users}
     for w in workers:
         w["name"] = user_map.get(w["phone"], w["phone"][-4:])
 

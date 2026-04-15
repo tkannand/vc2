@@ -30,9 +30,8 @@ const Scheme = {
         ungrouped: [],
         street: "",
         search: "",
-        otherStreet: "",
-        otherSearch: "",
         unfilledOnly: false,
+        deliveryFilter: "",
     },
 
     // ── Ward state ─────────────────────────────────────────────────
@@ -49,6 +48,7 @@ const Scheme = {
         search: "",
         booths: [],
         unfilledOnly: false,
+        deliveryFilter: "",
     },
 
     // ── Admin state ────────────────────────────────────────────────
@@ -64,6 +64,7 @@ const Scheme = {
         ungrouped: [],
         search: "",
         unfilledOnly: false,
+        deliveryFilter: "",
     },
 
     // ── Family builder modal state ─────────────────────────────────
@@ -171,8 +172,7 @@ const Scheme = {
             familiesAll: [], families: [],
             ungroupedAll: [], ungrouped: [],
             page: 0, street: "", search: "",
-            otherStreet: "", otherSearch: "",
-            unfilledOnly: false,
+            unfilledOnly: false, deliveryFilter: "",
         });
 
         this._populateSchemeDropdown("booth-scheme-select", id => this._onBoothSchemeChange(id));
@@ -196,10 +196,12 @@ const Scheme = {
 
         Object.assign(this.boothMode, {
             scheme: schemeObj, tab: "family", page: 0,
-            street: "", search: "", otherStreet: "", otherSearch: "",
-            unfilledOnly: false,
+            street: "", search: "",
+            unfilledOnly: false, deliveryFilter: "",
         });
 
+        const boothDF = document.getElementById("booth-scheme-delivery-filter");
+        if (boothDF) boothDF.value = "";
         content.style.display = "block";
         this._resetTabUI("#view-booth-scheme", "booth-scheme-family-panel", "booth-scheme-other-panel");
         this._bindBoothTabs();
@@ -225,7 +227,6 @@ const Scheme = {
         // Populate street dropdowns
         const streets = this._extractStreets([...families, ...ungrouped]);
         this._fillStreetSel("booth-scheme-street", streets);
-        this._fillStreetSel("booth-scheme-other-street", streets);
 
         this._applyBoothFilters();
         this._refreshSummary("booth");
@@ -234,11 +235,12 @@ const Scheme = {
     _applyBoothFilters() {
         const state = this.boothMode;
 
+        const sf = state.scheme?._statusField || "coupon_status";
         state.families = this._filterFams(
-            state.familiesAll, state.street, state.search, state.unfilledOnly
+            state.familiesAll, state.street, state.search, state.unfilledOnly, state.deliveryFilter, sf
         );
         state.ungrouped = this._filterFams(
-            state.ungroupedAll, state.otherStreet, state.search, state.unfilledOnly
+            state.ungroupedAll, state.street, state.search, state.unfilledOnly, state.deliveryFilter, sf
         );
 
         if (state.tab === "family") this._renderBoothFamilies();
@@ -286,15 +288,14 @@ const Scheme = {
 
     _bindBoothFilters() {
         const c = id => this._clone(id);
-        const search      = c("booth-scheme-search");
-        const street      = c("booth-scheme-street");
-        const otherStreet = c("booth-scheme-other-street");
+        const search = c("booth-scheme-search");
+        const street = c("booth-scheme-street");
 
-        if (search)      search.addEventListener("input",  () => { this.boothMode.search      = search.value;      this.boothMode.page = 0; this._applyBoothFilters(); });
-        if (street)      street.addEventListener("change", () => { this.boothMode.street      = street.value;      this.boothMode.page = 0; this._applyBoothFilters(); });
-        if (otherStreet) otherStreet.addEventListener("change", () => { this.boothMode.otherStreet = otherStreet.value; this._applyBoothFilters(); });
+        if (search) search.addEventListener("input",  () => { this.boothMode.search = search.value; this.boothMode.page = 0; this._applyBoothFilters(); });
+        if (street) street.addEventListener("change", () => { this.boothMode.street = street.value; this.boothMode.page = 0; this._applyBoothFilters(); });
 
         this._bindUnfilledToggle("btn-booth-scheme-unfilled", this.boothMode, () => this._applyBoothFilters());
+        this._bindDeliveryFilter("booth-scheme-delivery-filter", this.boothMode, () => this._applyBoothFilters());
     },
 
     _bindBoothNav() {
@@ -318,7 +319,7 @@ const Scheme = {
             familiesAll: [], families: [],
             ungroupedAll: [], ungrouped: [],
             page: 0, booth: "", street: "", search: "", otherSearch: "",
-            booths: [], unfilledOnly: false,
+            booths: [], unfilledOnly: false, deliveryFilter: "",
         });
 
         this._populateSchemeDropdown("ward-scheme-select", id => this._onWardSchemeChange(id));
@@ -342,9 +343,11 @@ const Scheme = {
         Object.assign(this.wardMode, {
             scheme: schemeObj, tab: "family", page: 0,
             booth: "", street: "", search: "", otherSearch: "",
-            unfilledOnly: false,
+            unfilledOnly: false, deliveryFilter: "",
         });
 
+        const wardDF = document.getElementById("ward-scheme-delivery-filter");
+        if (wardDF) wardDF.value = "";
         content.style.display = "block";
         this._resetTabUI("#view-ward-scheme", "ward-scheme-family-panel", "ward-scheme-other-panel");
         this._bindWardTabs();
@@ -414,8 +417,9 @@ const Scheme = {
             ? arr.filter(f => (f.booth || f.members[0]?.booth) === state.booth)
             : arr;
 
-        state.families = this._filterFams(byBooth(state.familiesAll), state.street, state.search, state.unfilledOnly);
-        state.ungrouped = this._filterFams(byBooth(state.ungroupedAll), state.street, state.search, state.unfilledOnly);
+        const sf = state.scheme?._statusField || "coupon_status";
+        state.families = this._filterFams(byBooth(state.familiesAll), state.street, state.search, state.unfilledOnly, state.deliveryFilter, sf);
+        state.ungrouped = this._filterFams(byBooth(state.ungroupedAll), state.street, state.search, state.unfilledOnly, state.deliveryFilter, sf);
 
         if (state.tab === "family") this._renderWardFamilies();
         else this._renderWardOther();
@@ -485,6 +489,7 @@ const Scheme = {
         });
 
         this._bindUnfilledToggle("btn-ward-scheme-unfilled", this.wardMode, () => this._applyWardFilters());
+        this._bindDeliveryFilter("ward-scheme-delivery-filter", this.wardMode, () => this._applyWardFilters());
     },
 
     _bindWardNav() {
@@ -506,11 +511,11 @@ const Scheme = {
         const isTa = I18n.currentLang === "ta";
         const q = query || "";
 
-        let html = `<div class="family-card ncc">`;
+        let html = `<div class="family-card ncc" data-famcode="${this._esc(fam.famcode)}">`;
 
         // ── Header ──────────────────────────────────────────────
         html += `<div class="ncc-header"><div class="ncc-header-left">`;
-        html += `<span class="ncc-house">🏠 ${this._esc(fam.house || "-")}</span>`;
+        html += `<span class="ncc-house">🏠 ${this._hl(fam.house || "-", q)}</span>`;
         if (!isSingle) html += `<span class="ncc-count">(${members.length})</span>`;
         const famStreet = fam.section || "";
         if (famStreet) html += `<span class="ncc-section">${this._hl(famStreet, q)}</span>`;
@@ -627,6 +632,7 @@ const Scheme = {
             icon.addEventListener("click", e => {
                 e.stopPropagation();
                 e.preventDefault();
+                this._editPersonDeliverFamcode = null;
                 const voterId = icon.dataset.voterId;
                 const memberBooth = icon.dataset.booth || "";
                 this._openEditPersonModal(voterId, memberBooth, mode);
@@ -705,6 +711,14 @@ const Scheme = {
                         btn.disabled = true;
                         await this._toggle(mode, fam.members.map(m => m.voter_id), "undeliver", famBooth);
                     } else {
+                        // Check if all members have filled data (green check)
+                        const unfilledMember = fam.members.find(m => !(m.phone_last4 || m.party_support));
+                        if (unfilledMember) {
+                            this._editPersonDeliverFamcode = fam.famcode;
+                            const memberBooth = unfilledMember.booth || famBooth;
+                            this._openEditPersonModal(unfilledMember.voter_id, memberBooth, mode);
+                            return;
+                        }
                         btn.disabled = true;
                         await this._toggle(mode, fam.members.map(m => m.voter_id), "deliver", famBooth);
                     }
@@ -971,7 +985,7 @@ const Scheme = {
         this._bindCardActions(area, mode);
     },
 
-    _filterFams(arr, street, search, unfilledOnly) {
+    _filterFams(arr, street, search, unfilledOnly, deliveryFilter, statusField) {
         let f = arr;
         if (street) f = f.filter(fam => fam.members.some(m => m.section === street));
         if (search) {
@@ -982,11 +996,19 @@ const Scheme = {
                 (m.name || "").toLowerCase().includes(q) ||
                 (m.name_en || "").toLowerCase().includes(q) ||
                 (m.name_ta || "").includes(q) ||
-                (m.section || "").toLowerCase().includes(q)
+                (m.section || "").toLowerCase().includes(q) ||
+                (fam.house || "").toLowerCase().includes(q)
             ));
         }
         if (unfilledOnly) {
             f = f.filter(fam => fam.members.some(m => !(m.phone_last4 || m.party_support)));
+        }
+        if (deliveryFilter && statusField) {
+            if (deliveryFilter === "delivered") {
+                f = f.filter(fam => fam.members.every(m => m[statusField] === "delivered"));
+            } else if (deliveryFilter === "not_delivered") {
+                f = f.filter(fam => fam.members.some(m => m[statusField] !== "delivered"));
+            }
         }
         return f;
     },
@@ -1006,6 +1028,17 @@ const Scheme = {
         });
     },
 
+    _bindDeliveryFilter(selectId, state, applyFn) {
+        const sel = document.getElementById(selectId);
+        if (!sel) return;
+        sel.value = state.deliveryFilter || "";
+        sel.addEventListener("change", () => {
+            state.deliveryFilter = sel.value;
+            state.page = 0;
+            applyFn();
+        });
+    },
+
     _extractStreets(fams) {
         return [...new Set(fams.flatMap(f => f.members.map(m => m.section)).filter(Boolean))].sort();
     },
@@ -1019,6 +1052,66 @@ const Scheme = {
 
     _findFam(state, famcode) {
         return [...state.familiesAll, ...state.ungroupedAll].find(f => f.famcode === famcode) || null;
+    },
+
+    /**
+     * After a save, navigate to the correct page/tab and scroll to the family card.
+     * Works for Family tab (paginated) and Other tab (unpaginated).
+     */
+    _scrollToFamily(mode, famcode) {
+        if (!famcode) return;
+        const state = mode === "booth" ? this.boothMode : mode === "ward" ? this.wardMode : this.adminMode;
+        const ps = this.PAGE_SIZE;
+
+        // Check Family tab first (filtered list — state.families)
+        const famIdx = state.families.findIndex(f => f.famcode === famcode);
+        if (famIdx !== -1) {
+            state.page = Math.floor(famIdx / ps);
+            state.tab = "family";
+        } else {
+            // Check Other tab (ungrouped)
+            const otherIdx = state.ungrouped.findIndex(f => f.famcode === famcode);
+            if (otherIdx !== -1) {
+                state.tab = "other";
+            } else {
+                // famcode not in current filtered view — nothing to scroll to
+                return;
+            }
+        }
+
+        // Activate the correct tab in the DOM
+        const viewSel = mode === "booth" ? "#view-booth-scheme"
+            : mode === "ward" ? "#view-ward-scheme" : "#view-admin-scheme";
+        const familyPanelId = mode === "booth" ? "booth-scheme-family-panel"
+            : mode === "ward" ? "ward-scheme-family-panel" : "admin-scheme-family-panel";
+        const otherPanelId = mode === "booth" ? "booth-scheme-other-panel"
+            : mode === "ward" ? "ward-scheme-other-panel" : "admin-scheme-other-panel";
+
+        const isFamily = state.tab === "family";
+        document.querySelectorAll(`${viewSel} .tab[data-scheme-tab]`).forEach(t => {
+            t.classList.toggle("active", t.dataset.schemeTab === state.tab);
+        });
+        const fp = document.getElementById(familyPanelId);
+        const op = document.getElementById(otherPanelId);
+        if (fp) fp.style.display = isFamily ? "block" : "none";
+        if (op) op.style.display = isFamily ? "none" : "block";
+
+        // Re-render the active tab
+        if (isFamily) {
+            if (mode === "booth") this._renderBoothFamilies();
+            else if (mode === "ward") this._renderWardFamilies();
+            else this._renderAdminFamilies();
+        } else {
+            if (mode === "booth") this._renderBoothOther();
+            else if (mode === "ward") this._renderWardOther();
+            else this._renderAdminOther();
+        }
+
+        // Scroll to the card after DOM update
+        setTimeout(() => {
+            const card = document.querySelector(`[data-famcode="${CSS.escape(famcode)}"]`);
+            if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 0);
     },
 
     _clone(id) {
@@ -1045,7 +1138,7 @@ const Scheme = {
             familiesAll: [], families: [],
             ungroupedAll: [], ungrouped: [],
             page: 0, search: "", otherSearch: "",
-            unfilledOnly: false,
+            unfilledOnly: false, deliveryFilter: "",
         });
 
         // Hide ward + booth rows until scheme is picked
@@ -1186,8 +1279,9 @@ const Scheme = {
 
     _applyAdminFilters() {
         const state = this.adminMode;
-        state.families = this._filterFams(state.familiesAll, "", state.search, state.unfilledOnly);
-        state.ungrouped = this._filterFams(state.ungroupedAll, "", state.search, state.unfilledOnly);
+        const sf = state.scheme?._statusField || "coupon_status";
+        state.families = this._filterFams(state.familiesAll, "", state.search, state.unfilledOnly, state.deliveryFilter, sf);
+        state.ungrouped = this._filterFams(state.ungroupedAll, "", state.search, state.unfilledOnly, state.deliveryFilter, sf);
         if (state.tab === "family") this._renderAdminFamilies();
         else this._renderAdminOther();
         this._refreshSummary("admin");
@@ -1250,6 +1344,7 @@ const Scheme = {
         });
 
         this._bindUnfilledToggle("btn-admin-scheme-unfilled", this.adminMode, () => this._applyAdminFilters());
+        this._bindDeliveryFilter("admin-scheme-delivery-filter", this.adminMode, () => this._applyAdminFilters());
     },
 
     _bindAdminNav() {
@@ -1532,7 +1627,7 @@ const Scheme = {
             : (m.name_seg || m.name_en || m.name || m.name_ta || "");
         const q = query || "";
 
-        let html = `<div class="other-search-row ncc-other-row ${isDelivered ? "ncc-delivered" : ""}">`;
+        let html = `<div class="other-search-row ncc-other-row ${isDelivered ? "ncc-delivered" : ""}" data-famcode="${this._esc(famcode)}">`;
         html += `<div class="ncc-member-info">`;
         const phoneIconO = `<span style="font-size:0.7rem;">&#9742;</span>`;
 
@@ -1582,6 +1677,7 @@ const Scheme = {
     _editPersonVoterId: null,
     _editPersonBooth: null,
     _editPersonMode: null,
+    _editPersonDeliverFamcode: null,
 
     async _openEditPersonModal(voterId, booth, mode) {
         const state = mode === "booth" ? this.boothMode : mode === "ward" ? this.wardMode : this.adminMode;
@@ -1643,6 +1739,9 @@ const Scheme = {
         } catch (e) {
             console.log("edit_person_reveal_error", e);
         }
+
+        // Always pre-add one empty phone input for quick entry
+        this._editPersonNewPhones = [""];
 
         // Render phone display
         this._renderEditPersonPhones();
@@ -1730,7 +1829,7 @@ const Scheme = {
         const partyCustom = document.getElementById("edit-person-party-custom");
         const errorDiv = document.getElementById("edit-person-error");
 
-        const close = () => { modal.style.display = "none"; };
+        const close = () => { modal.style.display = "none"; this._editPersonDeliverFamcode = null; };
 
         // Clone to remove old listeners
         const newOverlay = overlay.cloneNode(true);
@@ -1840,14 +1939,54 @@ const Scheme = {
                 }
                 App.showToast(I18n.t("person_updated"));
                 modal.style.display = "none";
-                // Re-render to update D badge — preserve scroll position
-                const mc2 = document.getElementById("main-content");
-                const savedScroll2 = mc2 ? mc2.scrollTop : 0;
+
+                // If opened from deliver flow, check remaining unfilled members
+                const deliverFamcode = this._editPersonDeliverFamcode;
+                if (deliverFamcode) {
+                    const fam = this._findFam(state, deliverFamcode);
+                    if (fam) {
+                        const sf = state.scheme._statusField || "coupon_status";
+                        const nextUnfilled = fam.members.find(m => !(m.phone_last4 || m.party_support));
+                        if (nextUnfilled) {
+                            // Open next unfilled member
+                            const famBooth = fam.booth || fam.members[0]?.booth || null;
+                            const nextBooth = nextUnfilled.booth || famBooth;
+                            this._openEditPersonModal(nextUnfilled.voter_id, nextBooth, mode);
+                            return;
+                        } else {
+                            // All filled — auto-deliver undelivered members
+                            this._editPersonDeliverFamcode = null;
+                            const famBooth = fam.booth || fam.members[0]?.booth || null;
+                            const undelivered = fam.members.filter(m => m[sf] !== "delivered").map(m => m.voter_id);
+                            if (undelivered.length > 0) {
+                                await this._toggle(mode, undelivered, "deliver", famBooth);
+                                return;
+                            }
+                        }
+                    }
+                    this._editPersonDeliverFamcode = null;
+                }
+
+                // Find which family this voter belongs to before re-render
+                let personFamcode = null;
+                const allFams2 = [...(state.familiesAll || []), ...(state.ungroupedAll || [])];
+                for (const fam of allFams2) {
+                    if (fam.members.some(m => m.voter_id === voterId)) {
+                        personFamcode = fam.famcode;
+                        break;
+                    }
+                }
+
+                // Re-render to update D badge
                 const applyFn = mode === "booth" ? () => this._applyBoothFilters()
                     : mode === "ward" ? () => this._applyWardFilters()
                     : () => this._applyAdminFilters();
                 applyFn();
-                if (mc2) mc2.scrollTop = savedScroll2;
+
+                // Scroll back to the family card
+                if (personFamcode) {
+                    this._scrollToFamily(mode, personFamcode);
+                }
             } else {
                 errorDiv.textContent = (res && res.detail) || I18n.t("error");
                 errorDiv.style.display = "block";
@@ -2136,18 +2275,19 @@ const Scheme = {
         if (submitBtn) App.setBtnLoading(submitBtn, false);
         if (res.error) { App.showToast(res.detail || I18n.t("error")); return; }
 
+        const savedFamcode = this._modalEditFamcode || res.famcode || null;
+
         App.showToast(isDelete ? I18n.t("family_deleted") : this._modalEditFamcode ? I18n.t("family_updated") : I18n.t("family_created"));
         this._closeModal();
-
-        // Preserve scroll position across data reload
-        const mc = document.getElementById("main-content");
-        const savedScroll = mc ? mc.scrollTop : 0;
 
         if (mode === "booth")      await this._loadBoothData();
         else if (mode === "ward")  await this._loadWardData();
         else                       await this._loadAdminData();
 
-        if (mc) mc.scrollTop = savedScroll;
+        // Scroll to the family that was just saved
+        if (savedFamcode && !isDelete) {
+            this._scrollToFamily(mode, savedFamcode);
+        }
     },
 
     // ── Language refresh (no API call — re-renders from cached data) ──
@@ -2158,9 +2298,7 @@ const Scheme = {
             if (this.boothMode.scheme) {
                 const streets = this._extractStreets([...this.boothMode.familiesAll, ...this.boothMode.ungroupedAll]);
                 this._fillStreetSel("booth-scheme-street", streets);
-                this._fillStreetSel("booth-scheme-other-street", streets);
                 if (this.boothMode.street) document.getElementById("booth-scheme-street").value = this.boothMode.street;
-                if (this.boothMode.otherStreet) document.getElementById("booth-scheme-other-street").value = this.boothMode.otherStreet;
                 if (this.boothMode.tab === "family") this._renderBoothFamilies();
                 else this._renderBoothOther();
             }

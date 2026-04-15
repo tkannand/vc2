@@ -342,12 +342,29 @@ async def create_coupon_family(request: Request, body: CouponFamilyRequest):
     if not body.voter_ids:
         raise HTTPException(status_code=400, detail="voter_ids required")
 
-    # Evict voters from relevant booths only — cross-ward voters get cross-claimed in their home ward
-    await _evict_voters_from_ward(body.ward, set(body.voter_ids), members_data=body.members_data,
+    # Move cross-ward voters into this ward/booth first, then evict from old families
+    added_home = _get_voter_home_locations(set(body.voter_ids), body.members_data)
+    cross_ward_vids = set()
+    for vid in body.voter_ids:
+        if vid in added_home and added_home[vid][0] != body.ward:
+            cross_ward_vids.add(vid)
+
+    # Evict from old families — exclude moved voters from members_data so they're treated as same-ward
+    local_members_data = [m for m in body.members_data if m.get("voter_id") not in cross_ward_vids]
+    await _evict_voters_from_ward(body.ward, set(body.voter_ids), members_data=local_members_data,
                                    target_booth=body.booth)
 
     famcode = storage.create_coupon_family(body.ward, body.booth, body.voter_ids, user["phone"],
                                            members_data=body.members_data)
+
+    # Same-ward voters — set famcode so they join across all tabs
+    # Cross-ward voters — move them into this ward/booth with the new famcode
+    for vid in body.voter_ids:
+        if vid in cross_ward_vids:
+            storage.move_voter(added_home[vid][0], added_home[vid][1],
+                               body.ward, body.booth, vid, famcode)
+        else:
+            storage.set_voter_famcode(body.ward, body.booth, vid, famcode)
     storage.log_coupon_action(body.ward, body.booth, "create", famcode,
                               body.voter_ids, [], user["phone"], _user_name(user))
     logger.info("coupon_family_created", famcode=famcode, by=user["phone"][-4:])
@@ -362,25 +379,40 @@ async def update_coupon_family(request: Request, famcode: str, body: CouponFamil
     old_cf = next((cf for cf in storage.get_coupon_families(body.ward, body.booth) if cf["famcode"] == famcode), {})
     old_ids = set(old_cf.get("voter_ids", []))
     old_members_data = old_cf.get("members_data", [])
+
+    # First edit of a natural family — no CouponFamilies row exists yet.
+    # Look up the natural members from voter data so we know who was removed.
+    if not old_ids:
+        nat_voters = storage.get_voters_by_booth(body.ward, body.booth)
+        old_ids = {v.get("RowKey", "") for v in nat_voters if v.get("famcode", "") == famcode}
     new_ids = set(body.voter_ids)
 
-    # Removed voters → eject from this ward; un-claim cross-ward voters (they return to home)
+    # Removed voters — clear famcode so they're permanently ungrouped
+    # (cross-ward voters were already moved into this ward/booth, so they're all local now)
     removed = list(old_ids - new_ids)
-    if removed:
-        removed_home = _get_voter_home_locations(set(removed), old_members_data)
-        same_ward_removed = [v for v in removed if v not in removed_home or removed_home[v][0] == body.ward]
-        cross_ward_removed = [(v, removed_home[v]) for v in removed if v in removed_home and removed_home[v][0] != body.ward]
-        if same_ward_removed:
-            storage.add_ejected_coupon_voters(body.ward, body.booth, same_ward_removed)
-        for vid, (home_ward, home_booth) in cross_ward_removed:
-            # Un-claim from home ward → voter returns to their natural family there
-            storage.remove_cross_claimed_voters(home_ward, home_booth, [vid])
-            storage.remove_from_ejected_coupon_voters(home_ward, home_booth, [vid])
+    for vid in removed:
+        storage.clear_voter_famcode(body.ward, body.booth, vid)
 
-    # Evict newly-added voters from relevant booths (cross-ward ones get cross-claimed in home ward)
+    # Newly added voters:
+    # Same-ward — set famcode so they join across all tabs
+    # Cross-ward — move them into this ward/booth with the family's famcode
+    added = list(new_ids - old_ids)
+    cross_ward_vids = set()
+    if added:
+        added_home = _get_voter_home_locations(set(added), body.members_data)
+        for vid in added:
+            if vid in added_home and added_home[vid][0] != body.ward:
+                cross_ward_vids.add(vid)
+                storage.move_voter(added_home[vid][0], added_home[vid][1],
+                                   body.ward, body.booth, vid, famcode)
+            else:
+                storage.set_voter_famcode(body.ward, body.booth, vid, famcode)
+
+    # Evict newly-added voters from other families — exclude moved voters from members_data
     if new_ids:
+        local_members_data = [m for m in body.members_data if m.get("voter_id") not in cross_ward_vids]
         await _evict_voters_from_ward(body.ward, new_ids, skip_famcode=famcode,
-                                       members_data=body.members_data, target_booth=body.booth)
+                                       members_data=local_members_data, target_booth=body.booth)
 
     action = "update" if body.voter_ids else "delete"
     storage.log_coupon_action(body.ward, body.booth, action, famcode,

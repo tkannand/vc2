@@ -1,0 +1,16 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - heading "Dashboard" [level=1] [ref=e5]
+    - paragraph [ref=e6]: Administrator Access Only
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]: Phone Number
+      - textbox "Phone Number" [ref=e10]:
+        - /placeholder: 10-digit phone number
+    - generic [ref=e11]:
+      - generic [ref=e12]: PIN
+      - textbox "PIN" [ref=e13]:
+        - /placeholder: 4-digit PIN
+    - button "Sign In" [ref=e14] [cursor=pointer]
+  - link "Forgot PIN?" [ref=e15] [cursor=pointer]:
+    - /url: "#"

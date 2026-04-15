@@ -44,6 +44,8 @@ class OTPVerify(BaseModel):
 class RoleSelectRequest(BaseModel):
     phone: str = Field(..., min_length=10, max_length=10)
     role: str
+    ward: Optional[str] = None
+    booth: Optional[str] = None
     language: Optional[str] = "en"
 
     @field_validator("phone")

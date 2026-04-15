@@ -555,6 +555,55 @@ def update_voter_person_data(ward: str, booth: str, voter_id: str,
                 has_party=bool(party_support))
 
 
+def set_voter_famcode(ward: str, booth: str, voter_id: str, famcode: str):
+    """Set a voter's famcode. Use empty string to ungrouped them."""
+    from azure.data.tables import UpdateMode
+    table = get_table(table_name("Voters"))
+    pk = f"{normalize_key(ward)}__{normalize_key(booth)}"
+    table.upsert_entity({
+        "PartitionKey": pk,
+        "RowKey": voter_id,
+        "famcode": famcode,
+    }, mode=UpdateMode.MERGE)
+
+
+def clear_voter_famcode(ward: str, booth: str, voter_id: str):
+    """Clear a voter's famcode so they become ungrouped in natural family building."""
+    set_voter_famcode(ward, booth, voter_id, "")
+
+
+def move_voter(from_ward: str, from_booth: str, to_ward: str, to_booth: str,
+               voter_id: str, new_famcode: str):
+    """Move a voter from one ward/booth to another. Deletes from old partition, inserts into new."""
+    table = get_table(table_name("Voters"))
+    from_pk = f"{normalize_key(from_ward)}__{normalize_key(from_booth)}"
+    to_pk = f"{normalize_key(to_ward)}__{normalize_key(to_booth)}"
+
+    try:
+        entity = dict(table.get_entity(from_pk, voter_id))
+    except ResourceNotFoundError:
+        logger.warning("move_voter_not_found", voter_id=voter_id,
+                       from_ward=from_ward, from_booth=from_booth)
+        return
+
+    # Delete from old partition
+    table.delete_entity(from_pk, voter_id)
+
+    # Insert into new partition with updated fields
+    entity["PartitionKey"] = to_pk
+    entity["ward"] = to_ward
+    entity["booth"] = to_booth
+    entity["famcode"] = new_famcode
+    # Clear etag so Azure doesn't reject the insert
+    entity.pop("_metadata", None)
+    entity.pop("odata.etag", None)
+    table.upsert_entity(entity)
+
+    logger.info("voter_moved", voter_id=voter_id,
+                from_ward=from_ward, from_booth=from_booth,
+                to_ward=to_ward, to_booth=to_booth, new_famcode=new_famcode)
+
+
 def store_dashboard_cache(voter_counts: dict, wards: list, booths_per_ward: dict,
                           seg_counts: dict = None, universe: dict = None):
     """Persist ward/booth/count metadata so dashboard never scans the Voters table.
@@ -654,17 +703,91 @@ def get_voter_count() -> int:
 
 # ---- User Operations ----
 
+def _user_row_key(phone: str, role: str, ward: str = "", booth: str = "") -> str:
+    """Generate compound RowKey for multi-assignment support.
+
+    Format: phone__wardNorm__boothNorm  (non-superadmin with ward/booth)
+            phone                       (superadmin, or legacy entries)
+    """
+    if role == "superadmin" or (not ward and not booth):
+        return phone
+    parts = [phone]
+    if ward:
+        parts.append(normalize_key(ward))
+    if booth:
+        parts.append(normalize_key(booth))
+    return "__".join(parts)
+
+
+def _phone_from_row_key(row_key: str) -> str:
+    """Extract the 10-digit phone from a plain or compound RowKey."""
+    return row_key.split("__")[0]
+
+
+def _query_user_entities(phone: str) -> list:
+    """Return all User entities for a phone across all roles.
+
+    Single range query that finds both legacy (RowKey=phone) and
+    compound (RowKey=phone__ward__booth) entries without duplicates.
+    If both a legacy and compound entity exist for the same role,
+    the legacy one is auto-deleted (self-healing migration).
+    """
+    table = get_table(table_name("Users"))
+    entities = list(table.query_entities(
+        f"RowKey ge '{phone}' and RowKey lt '{phone}~'"
+    ))
+    all_entities = [dict(e) for e in entities]
+
+    # Self-healing: if both legacy (RowKey=phone) and compound (RowKey=phone__...)
+    # exist for the same role, delete the legacy one and keep the compound one.
+    roles_with_compound = set()
+    for e in all_entities:
+        if "__" in e["RowKey"]:
+            roles_with_compound.add(e["PartitionKey"])
+
+    results = []
+    for e in all_entities:
+        is_legacy = e["RowKey"] == phone
+        if is_legacy and e["PartitionKey"] in roles_with_compound:
+            # Duplicate legacy entry — delete it
+            try:
+                table.delete_entity(e["PartitionKey"], phone)
+                logger.info("legacy_duplicate_cleaned", phone=phone[-4:], role=e["PartitionKey"])
+            except ResourceNotFoundError:
+                pass
+            continue
+        results.append(e)
+
+    return results
+
+
 def upsert_user(phone: str, name: str, role: str, ward: str = "", booth: str = "", language: str = "en"):
     table = get_table(table_name("Users"))
-    # Fetch existing to preserve security fields (device_id, active, schedule, geo_tracking, location)
-    try:
-        existing = dict(table.get_entity(role, phone))
-    except ResourceNotFoundError:
-        existing = {}
+    row_key = _user_row_key(phone, role, ward, booth)
+
+    # If compound key, check for a legacy bare-phone entity and migrate it
+    existing = {}
+    if row_key != phone:
+        try:
+            legacy = dict(table.get_entity(role, phone))
+            # Legacy entity exists — use its fields as base, then delete it
+            existing = legacy
+            table.delete_entity(role, phone)
+            logger.info("legacy_entity_migrated", phone=phone[-4:], role=role)
+        except ResourceNotFoundError:
+            pass
+
+    # Fetch existing compound-key entity if present (preserves security fields)
+    if not existing:
+        try:
+            existing = dict(table.get_entity(role, row_key))
+        except ResourceNotFoundError:
+            existing = {}
+
     entity = {
         **existing,           # preserve all existing fields (incl. security fields)
         "PartitionKey": role,
-        "RowKey": phone,
+        "RowKey": row_key,
         "name": name,
         "ward": ward,
         "booth": booth,
@@ -676,30 +799,18 @@ def upsert_user(phone: str, name: str, role: str, ward: str = "", booth: str = "
         entity["geo_tracking"] = True
     table.upsert_entity(entity)
     invalidate_user_security_cache(phone)
-    logger.info("user_upserted", phone=phone[-4:], role=role)
+    logger.info("user_upserted", phone=phone[-4:], role=role, ward=ward, booth=booth)
 
 
 def get_user(phone: str) -> Optional[dict]:
-    table = get_table(table_name("Users"))
-    for role in ["superadmin", "ward", "booth", "telecaller"]:
-        try:
-            entity = table.get_entity(role, phone)
-            return dict(entity)
-        except ResourceNotFoundError:
-            continue
-    return None
+    """Return the first user entity matching this phone (any role)."""
+    entities = _query_user_entities(phone)
+    return entities[0] if entities else None
 
 
 def get_user_roles(phone: str) -> list:
-    table = get_table(table_name("Users"))
-    roles = []
-    for role in ["superadmin", "ward", "booth", "telecaller"]:
-        try:
-            entity = table.get_entity(role, phone)
-            roles.append(dict(entity))
-        except ResourceNotFoundError:
-            continue
-    return roles
+    """Return all role/assignment entities for a phone (supports multi-assignment)."""
+    return _query_user_entities(phone)
 
 
 def get_all_users() -> list:
@@ -707,11 +818,32 @@ def get_all_users() -> list:
     return list(table.query_entities(""))
 
 
-def delete_user(phone: str, role: str):
+def delete_user(phone: str, role: str, ward: str = "", booth: str = ""):
+    """Delete a specific user assignment. Tries compound key first, falls back to legacy."""
+    table = get_table(table_name("Users"))
+    row_key = _user_row_key(phone, role, ward, booth)
+    try:
+        table.delete_entity(role, row_key)
+        logger.info("user_deleted", phone=phone[-4:], role=role, ward=ward, booth=booth)
+        return
+    except ResourceNotFoundError:
+        pass
+    # Fallback: try legacy RowKey (bare phone) if compound key didn't match
+    if row_key != phone:
+        try:
+            table.delete_entity(role, phone)
+            logger.info("user_deleted_legacy", phone=phone[-4:], role=role)
+        except ResourceNotFoundError:
+            pass
+
+
+def delete_user_entity(entity: dict):
+    """Delete a user entity by its exact PartitionKey + RowKey."""
     table = get_table(table_name("Users"))
     try:
-        table.delete_entity(role, phone)
-        logger.info("user_deleted", phone=phone[-4:], role=role)
+        table.delete_entity(entity["PartitionKey"], entity["RowKey"])
+        phone = _phone_from_row_key(entity["RowKey"])
+        logger.info("user_deleted", phone=phone[-4:], role=entity["PartitionKey"])
     except ResourceNotFoundError:
         pass
 
@@ -721,11 +853,8 @@ def update_user_security(phone: str, active: Optional[bool] = None,
                          geo_tracking: Optional[bool] = None):
     """Update security fields across all role entities for a phone number."""
     table = get_table(table_name("Users"))
-    for role in ["superadmin", "ward", "booth", "telecaller"]:
-        try:
-            entity = dict(table.get_entity(role, phone))
-        except ResourceNotFoundError:
-            continue
+    entities = _query_user_entities(phone)
+    for entity in entities:
         if active is not None:
             entity["active"] = active
         if schedule is not None:
@@ -740,30 +869,23 @@ def update_user_security(phone: str, active: Optional[bool] = None,
 def update_user_location(phone: str, lat: float, lng: float, ts: str):
     """Store last known GPS location on all role entities."""
     table = get_table(table_name("Users"))
-    for role in ["superadmin", "ward", "booth", "telecaller"]:
-        try:
-            entity = dict(table.get_entity(role, phone))
-            entity["last_lat"] = lat
-            entity["last_lng"] = lng
-            entity["last_location_at"] = ts
-            table.upsert_entity(entity)
-        except ResourceNotFoundError:
-            continue
+    entities = _query_user_entities(phone)
+    for entity in entities:
+        entity["last_lat"] = lat
+        entity["last_lng"] = lng
+        entity["last_location_at"] = ts
+        table.upsert_entity(entity)
 
 
 def record_login(phone: str):
     """Increment login_count and set last_login_at on all role entities for a phone."""
-    from azure.data.tables import UpdateMode
     table = get_table(table_name("Users"))
     now = datetime.now(timezone.utc).isoformat()
-    for role in ["superadmin", "ward", "booth", "telecaller"]:
-        try:
-            entity = dict(table.get_entity(role, phone))
-            entity["login_count"] = entity.get("login_count", 0) + 1
-            entity["last_login_at"] = now
-            table.upsert_entity(entity)
-        except ResourceNotFoundError:
-            continue
+    entities = _query_user_entities(phone)
+    for entity in entities:
+        entity["login_count"] = entity.get("login_count", 0) + 1
+        entity["last_login_at"] = now
+        table.upsert_entity(entity)
     logger.info("login_recorded", phone=phone[-4:])
 
 

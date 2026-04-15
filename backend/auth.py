@@ -327,7 +327,7 @@ def _create_session_response(phone: str, user: dict, ip: str = "") -> dict:
     }
 
 
-def select_role(phone: str, role: str, ip: str = "") -> dict:
+def select_role(phone: str, role: str, ip: str = "", ward: str = "", booth: str = "") -> dict:
     # Block non-superadmin role selection when app access is disabled
     if not storage.get_app_access_enabled() and role != "superadmin":
         storage.log_activity(phone, "role_select_blocked_app_disabled", ip=ip, details=f"role={role}")
@@ -339,7 +339,14 @@ def select_role(phone: str, role: str, ip: str = "") -> dict:
         return {"success": False, "message": "telecalling_disabled"}
 
     user_roles = storage.get_user_roles(phone)
-    matched = [u for u in user_roles if u["PartitionKey"] == role]
+    # When ward/booth specified, match the exact assignment
+    if ward or booth:
+        matched = [u for u in user_roles
+                   if u["PartitionKey"] == role
+                   and u.get("ward", "") == ward
+                   and u.get("booth", "") == booth]
+    else:
+        matched = [u for u in user_roles if u["PartitionKey"] == role]
     if not matched:
         storage.log_activity(phone, "role_select_invalid", ip=ip, details=f"role={role}")
         return {"success": False, "message": "Invalid role selection"}
@@ -389,8 +396,8 @@ def validate_session(token: str) -> dict | None:
 
 
 def update_user_language(phone: str, language: str):
-    user = storage.get_user(phone)
-    if user:
+    all_entities = storage.get_user_roles(phone)
+    for user in all_entities:
         storage.upsert_user(
             phone=phone,
             name=user.get("name", ""),

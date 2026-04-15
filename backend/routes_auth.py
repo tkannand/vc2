@@ -124,7 +124,7 @@ async def api_verify_otp(body: OTPVerify, request: Request, response: Response):
 @router.post("/select-role")
 async def api_select_role(body: RoleSelectRequest, request: Request, response: Response):
     ip = get_client_ip(request)
-    result = select_role(body.phone, body.role, ip)
+    result = select_role(body.phone, body.role, ip, ward=body.ward or "", booth=body.booth or "")
 
     if result.get("success") and result.get("token"):
         if body.language and body.language in ("en", "ta"):

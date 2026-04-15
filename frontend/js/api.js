@@ -75,7 +75,9 @@ const API = {
     forgotPinReset(phone, otp, newPin, newPinConfirm, language) {
         return this.post("/api/auth/forgot-pin/reset", { phone, otp, new_pin: newPin, new_pin_confirm: newPinConfirm, language });
     },
-    selectRole(phone, role, language) { return this.post("/api/auth/select-role", { phone, role, language }); },
+    selectRole(phone, role, language, ward, booth) {
+        return this.post("/api/auth/select-role", { phone, role, language, ward: ward || "", booth: booth || "" });
+    },
     logout() { return this.post("/api/auth/logout"); },
     async getMe() {
         this._skipExpiredHandler = true;
@@ -174,8 +176,24 @@ const API = {
     getAdminWardDetail(ward) { return this.get(`/api/admin/ward-detail?ward=${enc(ward)}`); },
     getAdminUsers() { return this.get("/api/admin/users"); },
     addUser(data) { return this.post("/api/admin/users", data); },
-    updateUser(phone, data) { return this.request("PUT", `/api/admin/users/${enc(phone)}`, data); },
-    removeUser(phone) { return this.del(`/api/admin/users/${enc(phone)}`); },
+    updateUser(phone, data, oldRole, oldWard, oldBooth) {
+        let url = `/api/admin/users/${enc(phone)}`;
+        const p = [];
+        if (oldRole)  p.push(`old_role=${enc(oldRole)}`);
+        if (oldWard)  p.push(`old_ward=${enc(oldWard)}`);
+        if (oldBooth) p.push(`old_booth=${enc(oldBooth)}`);
+        if (p.length) url += "?" + p.join("&");
+        return this.request("PUT", url, data);
+    },
+    removeUser(phone, role, ward, booth) {
+        let url = `/api/admin/users/${enc(phone)}`;
+        const p = [];
+        if (role)  p.push(`role=${enc(role)}`);
+        if (ward)  p.push(`ward=${enc(ward)}`);
+        if (booth) p.push(`booth=${enc(booth)}`);
+        if (p.length) url += "?" + p.join("&");
+        return this.del(url);
+    },
     bulkRemoveUsers(phones) { return this.post("/api/admin/users/bulk-remove", { phones }); },
     getUserLocations() { return this.get("/api/admin/user-locations"); },
     getUserActivityStats() { return this.get("/api/admin/user-activity-stats"); },

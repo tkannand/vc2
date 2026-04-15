@@ -111,7 +111,7 @@ async def get_dashboard(request: Request, ward: Optional[str] = None, booths: Op
         booth=booth_filter[0] if len(booth_filter) == 1 else ""
     )
     for w_stat in target_workers:
-        matched = next((u for u in all_users if u["RowKey"] == w_stat["phone"]), None)
+        matched = next((u for u in all_users if storage._phone_from_row_key(u["RowKey"]) == w_stat["phone"]), None)
         if matched:
             w_stat["name"] = matched.get("name", w_stat["phone"][-4:])
         else:
@@ -156,7 +156,7 @@ async def get_ward_detail(request: Request, ward: str):
     workers = storage.get_worker_activity_summary(ward=ward)
     all_users = storage.get_all_users()
     for w in workers:
-        matched = next((u for u in all_users if u["RowKey"] == w["phone"]), None)
+        matched = next((u for u in all_users if storage._phone_from_row_key(u["RowKey"]) == w["phone"]), None)
         if matched:
             w["name"] = matched.get("name", w["phone"][-4:])
         else:
@@ -177,6 +177,8 @@ async def get_users(request: Request):
     bi_cache = {}
     result = []
     for u in users:
+        # Extract phone from RowKey (handles both legacy "phone" and compound "phone__ward__booth")
+        phone = storage._phone_from_row_key(u["RowKey"])
         ward = u.get("ward", "")
         booth = u.get("booth", "")
         booth_number = ""
@@ -190,11 +192,11 @@ async def get_users(request: Request):
             booth_name = info.get("booth_name", "")
             booth_name_tamil = info.get("booth_name_tamil", "")
         result.append({
-            "phone": u["RowKey"],
+            "phone": phone,
             "name": u.get("name", ""),
             "role": u["PartitionKey"],
-            "ward": u.get("ward", ""),
-            "booth": u.get("booth", ""),
+            "ward": ward,
+            "booth": booth,
             "booth_number": booth_number,
             "booth_name": booth_name,
             "booth_name_tamil": booth_name_tamil,
@@ -209,7 +211,7 @@ async def get_users(request: Request):
             # Login tracking
             "login_count": u.get("login_count", 0),
             "last_login_at": u.get("last_login_at", ""),
-            "has_pin": u["RowKey"] in phones_with_pin,
+            "has_pin": phone in phones_with_pin,
         })
     return {"users": result}
 
@@ -219,9 +221,15 @@ async def add_user(request: Request, body: AddUserRequest):
     admin = require_role(request, "superadmin")
     ip = get_client_ip(request)
 
+    # Block only exact duplicates (same role + same ward + same booth)
     existing_roles = storage.get_user_roles(body.phone)
-    if any(u["PartitionKey"] == body.role for u in existing_roles):
-        raise HTTPException(status_code=400, detail="User already has this role")
+    if any(
+        u["PartitionKey"] == body.role
+        and u.get("ward", "") == (body.ward or "")
+        and u.get("booth", "") == (body.booth or "")
+        for u in existing_roles
+    ):
+        raise HTTPException(status_code=400, detail="User already has this exact assignment")
 
     if body.role in ("ward", "telecaller") and not body.ward:
         raise HTTPException(status_code=400, detail="Ward is required for this role")
@@ -240,7 +248,8 @@ async def add_user(request: Request, body: AddUserRequest):
 
 
 @router.put("/users/{phone}")
-async def update_user(request: Request, phone: str, body: AddUserRequest):
+async def update_user(request: Request, phone: str, body: AddUserRequest,
+                      old_role: str = "", old_ward: str = "", old_booth: str = ""):
     admin = require_role(request, "superadmin")
     ip = get_client_ip(request)
 
@@ -260,10 +269,19 @@ async def update_user(request: Request, phone: str, body: AddUserRequest):
     if body.role == "booth" and (not body.ward or not body.booth):
         raise HTTPException(status_code=400, detail="Ward and booth are required for booth role")
 
-    # Determine current stored role (PartitionKey) for role-change detection
-    current_role = existing_roles[0]["PartitionKey"]
-    if current_role != body.role:
-        storage.delete_user(phone, current_role)
+    # Find the specific old assignment to replace
+    if old_role:
+        # Delete the old assignment (specific entity identified by old_role+old_ward+old_booth)
+        storage.delete_user(phone, old_role, old_ward, old_booth)
+    else:
+        # Legacy: find first non-superadmin entity and delete if role/ward/booth changed
+        old_entity = next((u for u in existing_roles if u["PartitionKey"] != "superadmin"), None)
+        if old_entity:
+            old_r = old_entity["PartitionKey"]
+            old_w = old_entity.get("ward", "")
+            old_b = old_entity.get("booth", "")
+            if old_r != body.role or old_w != (body.ward or "") or old_b != (body.booth or ""):
+                storage.delete_user(phone, old_r, old_w, old_b)
 
     storage.upsert_user(phone=phone, name=body.name, role=body.role,
                         ward=body.ward or "", booth=body.booth or "")
@@ -272,21 +290,28 @@ async def update_user(request: Request, phone: str, body: AddUserRequest):
 
 
 @router.delete("/users/{phone}")
-async def remove_user(request: Request, phone: str):
+async def remove_user(request: Request, phone: str,
+                      role: str = "", ward: str = "", booth: str = ""):
     admin = require_role(request, "superadmin")
     ip = get_client_ip(request)
 
     if phone == admin["phone"]:
         raise HTTPException(status_code=400, detail="Cannot remove yourself")
 
-    target = storage.get_user(phone)
-    if not target:
-        raise HTTPException(status_code=404, detail="User not found")
+    if role:
+        # Remove a specific assignment
+        if role == "superadmin":
+            raise HTTPException(status_code=400, detail="Cannot remove superadmin")
+        storage.delete_user(phone, role, ward, booth)
+    else:
+        # Legacy: remove first found entity
+        target = storage.get_user(phone)
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found")
+        if target.get("PartitionKey") == "superadmin":
+            raise HTTPException(status_code=400, detail="Cannot remove superadmin")
+        storage.delete_user_entity(target)
 
-    if target.get("PartitionKey") == "superadmin":
-        raise HTTPException(status_code=400, detail="Cannot remove superadmin")
-
-    storage.delete_user(phone, target["PartitionKey"])
     log_user_management(admin["phone"], "remove", phone, ip)
     return {"success": True, "message": "User removed"}
 
@@ -311,7 +336,7 @@ async def bulk_remove_users(request: Request, body: BulkRemoveRequest):
             skipped += 1
             continue
         for u in user_roles:
-            storage.delete_user(phone, u["PartitionKey"])
+            storage.delete_user_entity(u)
         removed += 1
 
     log_user_management(admin_phone, "bulk_remove", f"{removed}_users", ip)
@@ -369,7 +394,7 @@ async def get_user_locations(request: Request):
     result = []
     seen = set()  # deduplicate by phone (multi-role users appear once)
     for u in all_users:
-        phone = u["RowKey"]
+        phone = storage._phone_from_row_key(u["RowKey"])
         if phone in seen:
             continue
         seen.add(phone)
@@ -473,31 +498,81 @@ async def get_summary(
         ward_booths: dict = {w: storage.get_booths_for_ward(w) for w in all_wards}
         all_wb_pairs      = [(w, b) for w, blist in ward_booths.items() for b in blist]
 
+    family_scheme_ids = [sc["id"] for sc in custom_schemes if sc.get("type", "family") == "family"]
+
+    async def _empty_dict(): return {}
+    async def _empty_notice(): return {"total": 0, "delivered": 0, "pending": 0}
+
     async def fetch_booth_all(w: str, b: str):
-        raw_statuses = await asyncio.to_thread(storage.get_all_call_statuses, w, b)
         pk = f"{storage.normalize_key(w)}__{storage.normalize_key(b)}"
+
+        # Parallel fetch: call statuses, notice, raw coupon, famcodes, custom schemes
+        coros = [
+            asyncio.to_thread(storage.get_all_call_statuses, w, b),
+            asyncio.to_thread(storage.get_notice_stats, w, b) if notice_enabled else _empty_notice(),
+            asyncio.to_thread(storage.get_all_coupon_statuses, w, b) if coupon_enabled else _empty_dict(),
+            asyncio.to_thread(storage.get_voter_famcodes_for_booth, w, b),
+        ]
+        scheme_coros = [asyncio.to_thread(storage.get_all_scheme_statuses, w, b, sc["id"])
+                        for sc in custom_schemes]
+        all_results = await asyncio.gather(*coros, *scheme_coros)
+
+        raw_statuses = all_results[0]
+        notice       = all_results[1]
+        coupon_raw   = all_results[2]
+        famcodes     = all_results[3]
+        scheme_raw_list = all_results[4:]
+
+        # Calling stats
         cached_total = storage.get_setting(f"seg_count_{pk}") or storage.get_setting(f"voter_count_{pk}")
         total   = int(cached_total) if cached_total else 0
         called  = sum(1 for s in raw_statuses.values() if s.get("status") == "called")
         didnt   = sum(1 for s in raw_statuses.values() if s.get("status") == "didnt_answer")
-        skipped = sum(1 for s in raw_statuses.values() if s.get("status") == "skipped")
+        skipped_c = sum(1 for s in raw_statuses.values() if s.get("status") == "skipped")
         calling = {
             "total": total, "called": called, "didnt_answer": didnt,
-            "skipped": skipped, "not_called": max(0, total - called - didnt - skipped),
+            "skipped": skipped_c, "not_called": max(0, total - called - didnt - skipped_c),
             "completion_pct": round(called / total * 100 if total else 0, 1),
         }
-        notice = (await asyncio.to_thread(storage.get_notice_stats, w, b)
-                  if notice_enabled else {"total": 0, "delivered": 0, "pending": 0})
-        coupon = (await asyncio.to_thread(storage.get_coupon_stats, w, b)
-                  if coupon_enabled else {"total": 0, "delivered": 0})
+
+        # Coupon voter-level stats (computed from raw statuses)
+        voter_count_cached = storage.get_setting(f"voter_count_{pk}")
+        voter_total = int(voter_count_cached) if voter_count_cached else len(famcodes)
+        coupon_delivered = sum(1 for s in coupon_raw.values() if s.get("status") == "delivered")
+        coupon = {"total": voter_total, "delivered": coupon_delivered}
+
+        # Custom scheme stats (from raw statuses)
         scheme_stats = {}
-        if custom_schemes:
-            scheme_results = await asyncio.gather(*[
-                asyncio.to_thread(storage.get_scheme_stats, w, b, sc["id"])
-                for sc in custom_schemes
-            ])
-            scheme_stats = {sc["id"]: sr for sc, sr in zip(custom_schemes, scheme_results)}
-        return w, b, calling, list(raw_statuses.values()), notice, coupon, scheme_stats
+        scheme_raw = {}
+        for sc, sr in zip(custom_schemes, scheme_raw_list):
+            delivered = sum(1 for s in sr.values() if s.get("status") == "delivered")
+            scheme_stats[sc["id"]] = {"total": voter_total, "delivered": delivered}
+            scheme_raw[sc["id"]] = sr
+
+        # Family-level completion: group by famcode, check delivery
+        fam_all = set()
+        fam_coupon_done = set()
+        fam_scheme_done = {sid: set() for sid in family_scheme_ids}
+        for v in famcodes:
+            fc = v["famcode"]
+            if not fc:
+                continue
+            fam_all.add(fc)
+            vid = v["voter_id"]
+            if (coupon_raw.get(vid) or {}).get("status") == "delivered":
+                fam_coupon_done.add(fc)
+            for sid in family_scheme_ids:
+                if (scheme_raw.get(sid, {}).get(vid) or {}).get("status") == "delivered":
+                    fam_scheme_done[sid].add(fc)
+
+        fam_data = {
+            "total": len(fam_all),
+            "coupon_done": len(fam_coupon_done),
+        }
+        for sid in family_scheme_ids:
+            fam_data[f"scheme_{sid}_done"] = len(fam_scheme_done[sid])
+
+        return w, b, calling, list(raw_statuses.values()), notice, coupon, scheme_stats, fam_data
 
     # Filtered views: one ward/booth-level scan runs in parallel with booth stats.
     # One range query covers all booths — no per-booth famcode queries needed.
@@ -518,8 +593,11 @@ async def get_summary(
     ward_map: dict = {}
     all_statuses   = []
     grand_custom   = {sc["id"]: {"total": 0, "delivered": 0} for sc in custom_schemes}
+    grand_fam      = {"total": 0, "coupon_done": 0}
+    for sid in family_scheme_ids:
+        grand_fam[f"scheme_{sid}_done"] = 0
 
-    for w, b, calling, statuses, notice, coupon, scheme_stats in results:
+    for w, b, calling, statuses, notice, coupon, scheme_stats, fam_data in results:
         if w not in ward_map:
             ward_map[w] = {
                 "ward": w,
@@ -544,6 +622,11 @@ async def get_summary(
                 grand_custom[sc_id]["total"]     += sc_stats["total"]
                 grand_custom[sc_id]["delivered"] += sc_stats["delivered"]
         all_statuses.extend(statuses)
+        # Family aggregation
+        grand_fam["total"]       += fam_data.get("total", 0)
+        grand_fam["coupon_done"] += fam_data.get("coupon_done", 0)
+        for sid in family_scheme_ids:
+            grand_fam[f"scheme_{sid}_done"] += fam_data.get(f"scheme_{sid}_done", 0)
 
     ward_data = []
     grand_calling = {"total": 0, "called": 0, "didnt_answer": 0, "skipped": 0}
@@ -584,7 +667,7 @@ async def get_summary(
     workers   = storage.get_worker_activity_summary(ward=ward or "", booth=booth or "")
     all_users = storage.get_all_users()
     for ws in workers:
-        matched  = next((u for u in all_users if u["RowKey"] == ws["phone"]), None)
+        matched  = next((u for u in all_users if storage._phone_from_row_key(u["RowKey"]) == ws["phone"]), None)
         ws["name"] = matched.get("name", ws["phone"][-4:]) if matched else ws["phone"][-4:]
 
     user_count = {"superadmin": 0, "ward": 0, "booth": 0, "telecaller": 0}
@@ -650,6 +733,8 @@ async def get_summary(
             ],
         }
 
+    fam_total = grand_fam["total"]
+
     return {
         "universe": universe,
         "universe_scope": universe_scope,
@@ -675,16 +760,21 @@ async def get_summary(
                 "pending": ct - grand_coupon["delivered"],
                 "pct":     round(grand_coupon["delivered"] / ct * 100 if ct else 0, 1),
                 "enabled": coupon_enabled,
+                "families":      fam_total,
+                "families_done": grand_fam["coupon_done"],
             },
             "custom": [
                 {
                     "id":      sc["id"],
                     "name":    sc["name"],
+                    "type":    sc.get("type", "family"),
                     "total":   grand_custom[sc["id"]]["total"],
                     "done":    grand_custom[sc["id"]]["delivered"],
                     "pending": grand_custom[sc["id"]]["total"] - grand_custom[sc["id"]]["delivered"],
                     "pct":     round(grand_custom[sc["id"]]["delivered"] / grand_custom[sc["id"]]["total"] * 100
                                      if grand_custom[sc["id"]]["total"] else 0, 1),
+                    "families":      fam_total if sc.get("type", "family") == "family" else 0,
+                    "families_done": grand_fam.get(f"scheme_{sc['id']}_done", 0) if sc.get("type", "family") == "family" else 0,
                 }
                 for sc in custom_schemes
             ],
@@ -752,6 +842,7 @@ async def get_drill(request: Request, ward: str, booth: str = ""):
                     "age_18_25": 0, "age_26_35": 0, "age_36_45": 0,
                     "age_46_60": 0, "age_61_plus": 0,
                     "famcodes": set(),
+                    "famcodes_coupon_done": set(),
                 }
             d = demo_by_sec[section]
             d["all_voters"] += 1
@@ -777,6 +868,8 @@ async def get_drill(request: Request, ward: str, booth: str = ""):
             fc = (v.get("famcode") or "").strip()
             if fc:
                 d["famcodes"].add(fc)
+                if (coupon_statuses.get(vid) or {}).get("status") == "delivered":
+                    d["famcodes_coupon_done"].add(fc)
 
             # Notice counts all voters
             if section not in notice_by_sec:
@@ -823,7 +916,8 @@ async def get_drill(request: Request, ward: str, booth: str = ""):
             cp = coupon_by_sec.get(s, {"total": 0, "delivered": 0})
             d = demo_by_sec.get(s, {"all_voters": 0, "surveyed": 0, "gm": 0, "gf": 0, "go": 0,
                                      "age_18_25": 0, "age_26_35": 0, "age_36_45": 0,
-                                     "age_46_60": 0, "age_61_plus": 0, "famcodes": set()})
+                                     "age_46_60": 0, "age_61_plus": 0,
+                                     "famcodes": set(), "famcodes_coupon_done": set()})
             c["not_called"] = c["total"] - c["called"] - c["didnt_answer"] - c["skipped"]
             c["completion_pct"] = round(c["called"] / c["total"] * 100 if c["total"] else 0, 1)
             item = {
@@ -837,6 +931,7 @@ async def get_drill(request: Request, ward: str, booth: str = ""):
                 "all_voters":       d["all_voters"],
                 "surveyed":         d["surveyed"],
                 "families":         len(d["famcodes"]),
+                "families_done":    len(d.get("famcodes_coupon_done", set())),
                 "gender_m":         d["gm"],
                 "gender_f":         d["gf"],
                 "gender_o":         d["go"],
@@ -853,31 +948,68 @@ async def get_drill(request: Request, ward: str, booth: str = ""):
             street_data.append(item)
 
         return {"level": "street", "ward": ward, "booth": booth, "items": street_data,
-                "custom_schemes": [{"id": sc["id"], "name": sc["name"]} for sc in custom_schemes]}
+                "custom_schemes": [{"id": sc["id"], "name": sc["name"], "type": sc.get("type", "family")} for sc in custom_schemes]}
 
     else:
         # Booth-level breakdown for a ward
         booths = storage.get_booths_for_ward(ward)
         bi_map = storage.get_booth_info_map(ward)
 
+        family_sc_ids = [sc["id"] for sc in custom_schemes if sc.get("type", "family") == "family"]
+
         async def fetch_booth_drill(b: str):
-            calling = await asyncio.to_thread(storage.get_call_stats, ward, b)
-            notice  = (await asyncio.to_thread(storage.get_notice_stats, ward, b)
-                       if notice_enabled else {"total": 0, "delivered": 0})
-            coupon  = (await asyncio.to_thread(storage.get_coupon_stats, ward, b)
-                       if coupon_enabled else {"total": 0, "delivered": 0})
+            async def _ed(): return {}
+            async def _en(): return {"total": 0, "delivered": 0}
+            coros = [
+                asyncio.to_thread(storage.get_call_stats, ward, b),
+                asyncio.to_thread(storage.get_notice_stats, ward, b) if notice_enabled else _en(),
+                asyncio.to_thread(storage.get_all_coupon_statuses, ward, b) if coupon_enabled else _ed(),
+                asyncio.to_thread(storage.get_voter_famcodes_for_booth, ward, b),
+            ]
+            sc_coros = [asyncio.to_thread(storage.get_all_scheme_statuses, ward, b, sc["id"])
+                        for sc in custom_schemes]
+            all_res = await asyncio.gather(*coros, *sc_coros)
+            calling     = all_res[0]
+            notice      = all_res[1]
+            coupon_raw  = all_res[2]
+            famcodes    = all_res[3]
+            sc_raw_list = all_res[4:]
+
+            # Coupon voter-level stats from raw
+            pk = f"{storage.normalize_key(ward)}__{storage.normalize_key(b)}"
+            vc = storage.get_setting(f"voter_count_{pk}")
+            vtotal = int(vc) if vc else len(famcodes)
+            coupon_del = sum(1 for s in coupon_raw.values() if s.get("status") == "delivered")
+            coupon = {"total": vtotal, "delivered": coupon_del}
+
             scheme_stats = {}
-            if custom_schemes:
-                scheme_results = await asyncio.gather(*[
-                    asyncio.to_thread(storage.get_scheme_stats, ward, b, sc["id"])
-                    for sc in custom_schemes
-                ])
-                scheme_stats = {sc["id"]: sr for sc, sr in zip(custom_schemes, scheme_results)}
-            return b, calling, notice, coupon, scheme_stats
+            sc_raw = {}
+            for sc, sr in zip(custom_schemes, sc_raw_list):
+                d = sum(1 for s in sr.values() if s.get("status") == "delivered")
+                scheme_stats[sc["id"]] = {"total": vtotal, "delivered": d}
+                sc_raw[sc["id"]] = sr
+
+            # Family completion
+            fam_all = set()
+            fam_coupon_done = set()
+            fam_sc_done = {sid: set() for sid in family_sc_ids}
+            for v in famcodes:
+                fc = v["famcode"]
+                if not fc:
+                    continue
+                fam_all.add(fc)
+                vid = v["voter_id"]
+                if (coupon_raw.get(vid) or {}).get("status") == "delivered":
+                    fam_coupon_done.add(fc)
+                for sid in family_sc_ids:
+                    if (sc_raw.get(sid, {}).get(vid) or {}).get("status") == "delivered":
+                        fam_sc_done[sid].add(fc)
+
+            return b, calling, notice, coupon, scheme_stats, len(fam_all), len(fam_coupon_done), {sid: len(s) for sid, s in fam_sc_done.items()}
 
         results = await asyncio.gather(*[fetch_booth_drill(b) for b in booths])
         booth_data = []
-        for b, calling, notice, coupon, scheme_stats in results:
+        for b, calling, notice, coupon, scheme_stats, fam_total, fam_coupon_done, fam_sc_done in results:
             info = bi_map.get(b, {})
             item = {
                 "booth":            b,
@@ -888,14 +1020,18 @@ async def get_drill(request: Request, ward: str, booth: str = ""):
                 "notice_delivered": notice["delivered"],
                 "coupon_total":     coupon["total"],
                 "coupon_delivered": coupon["delivered"],
+                "families":         fam_total,
+                "families_done":    fam_coupon_done,
             }
             for sc_id, sc_stats in scheme_stats.items():
                 item[f"scheme_{sc_id}_total"]     = sc_stats["total"]
                 item[f"scheme_{sc_id}_delivered"] = sc_stats["delivered"]
+            for sid in family_sc_ids:
+                item[f"scheme_{sid}_families_done"] = fam_sc_done.get(sid, 0)
             booth_data.append(item)
 
         return {"level": "booth", "ward": ward, "items": booth_data,
-                "custom_schemes": [{"id": sc["id"], "name": sc["name"]} for sc in custom_schemes]}
+                "custom_schemes": [{"id": sc["id"], "name": sc["name"], "type": sc.get("type", "family")} for sc in custom_schemes]}
 
 
 # ── Shared coroutine helper ───────────────────────────────────────────────────

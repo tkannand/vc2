@@ -367,8 +367,10 @@ const Auth = {
         const container = document.getElementById("role-buttons");
         container.innerHTML = roles.map((r) => {
             const detail = r.ward ? (r.booth ? `${r.ward} / ${r.booth}` : r.ward) : "";
+            const escWard = (r.ward || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+            const escBooth = (r.booth || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
             return `
-                <button class="role-select-btn" data-role="${r.role}">
+                <button class="role-select-btn" data-role="${r.role}" data-ward="${escWard}" data-booth="${escBooth}">
                     <div class="role-icon ${r.role}">${roleIcons[r.role] || ""}</div>
                     <div class="role-text">
                         <div class="role-label">${roleLabels[r.role] || r.role}</div>
@@ -380,15 +382,15 @@ const Auth = {
         }).join("");
 
         container.querySelectorAll(".role-select-btn").forEach((btn) => {
-            btn.addEventListener("click", () => this.selectRole(btn.dataset.role));
+            btn.addEventListener("click", () => this.selectRole(btn.dataset.role, btn.dataset.ward, btn.dataset.booth));
         });
     },
 
-    async selectRole(role) {
+    async selectRole(role, ward, booth) {
         const btns = document.querySelectorAll(".role-select-btn");
         btns.forEach((b) => (b.disabled = true));
 
-        const result = await API.selectRole(this.phone, role, this.selectedLang);
+        const result = await API.selectRole(this.phone, role, this.selectedLang, ward, booth);
 
         if (result.error || !result.success) {
             const msg = result.message === "app_access_disabled"
