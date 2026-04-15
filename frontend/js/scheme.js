@@ -30,6 +30,7 @@ const Scheme = {
         ungrouped: [],
         street: "",
         search: "",
+        searchType: "sl",
         unfilledOnly: false,
         deliveryFilter: "",
     },
@@ -46,6 +47,7 @@ const Scheme = {
         booth: "",
         street: "",
         search: "",
+        searchType: "sl",
         booths: [],
         unfilledOnly: false,
         deliveryFilter: "",
@@ -63,6 +65,7 @@ const Scheme = {
         ungroupedAll: [],
         ungrouped: [],
         search: "",
+        searchType: "sl",
         unfilledOnly: false,
         deliveryFilter: "",
     },
@@ -171,7 +174,7 @@ const Scheme = {
             scheme: null, tab: "family",
             familiesAll: [], families: [],
             ungroupedAll: [], ungrouped: [],
-            page: 0, street: "", search: "",
+            page: 0, street: "", search: "", searchType: "sl",
             unfilledOnly: false, deliveryFilter: "",
         });
 
@@ -196,12 +199,16 @@ const Scheme = {
 
         Object.assign(this.boothMode, {
             scheme: schemeObj, tab: "family", page: 0,
-            street: "", search: "",
+            street: "", search: "", searchType: "sl",
             unfilledOnly: false, deliveryFilter: "",
         });
 
         const boothDF = document.getElementById("booth-scheme-delivery-filter");
         if (boothDF) boothDF.value = "";
+        const boothST = document.getElementById("booth-scheme-search-type");
+        if (boothST) boothST.value = "sl";
+        const boothSI = document.getElementById("booth-scheme-search");
+        if (boothSI) { boothSI.value = ""; boothSI.placeholder = "Enter SL number..."; }
         content.style.display = "block";
         this._resetTabUI("#view-booth-scheme", "booth-scheme-family-panel", "booth-scheme-other-panel");
         this._bindBoothTabs();
@@ -237,10 +244,10 @@ const Scheme = {
 
         const sf = state.scheme?._statusField || "coupon_status";
         state.families = this._filterFams(
-            state.familiesAll, state.street, state.search, state.unfilledOnly, state.deliveryFilter, sf
+            state.familiesAll, state.street, state.search, state.unfilledOnly, state.deliveryFilter, sf, state.searchType
         );
         state.ungrouped = this._filterFams(
-            state.ungroupedAll, state.street, state.search, state.unfilledOnly, state.deliveryFilter, sf
+            state.ungroupedAll, state.street, state.search, state.unfilledOnly, state.deliveryFilter, sf, state.searchType
         );
 
         if (state.tab === "family") this._renderBoothFamilies();
@@ -290,8 +297,24 @@ const Scheme = {
         const c = id => this._clone(id);
         const search = c("booth-scheme-search");
         const street = c("booth-scheme-street");
+        const searchType = c("booth-scheme-search-type");
 
-        if (search) search.addEventListener("input",  () => { this.boothMode.search = search.value; this.boothMode.page = 0; this._applyBoothFilters(); });
+        const placeholders = { sl: "Enter SL number...", name: "Enter name...", door: "Enter door number...", epic: "Enter EPIC ID..." };
+
+        if (searchType) {
+            searchType.value = this.boothMode.searchType || "sl";
+            searchType.addEventListener("change", () => {
+                this.boothMode.searchType = searchType.value;
+                this.boothMode.search = "";
+                this.boothMode.page = 0;
+                if (search) { search.value = ""; search.placeholder = placeholders[searchType.value] || "Search..."; }
+                this._applyBoothFilters();
+            });
+        }
+        if (search) {
+            search.placeholder = placeholders[this.boothMode.searchType] || "Search...";
+            search.addEventListener("input", () => { this.boothMode.search = search.value; this.boothMode.page = 0; this._applyBoothFilters(); });
+        }
         if (street) street.addEventListener("change", () => { this.boothMode.street = street.value; this.boothMode.page = 0; this._applyBoothFilters(); });
 
         this._bindUnfilledToggle("btn-booth-scheme-unfilled", this.boothMode, () => this._applyBoothFilters());
@@ -318,7 +341,7 @@ const Scheme = {
             scheme: null, tab: "family",
             familiesAll: [], families: [],
             ungroupedAll: [], ungrouped: [],
-            page: 0, booth: "", street: "", search: "", otherSearch: "",
+            page: 0, booth: "", street: "", search: "", searchType: "sl", otherSearch: "",
             booths: [], unfilledOnly: false, deliveryFilter: "",
         });
 
@@ -342,12 +365,16 @@ const Scheme = {
 
         Object.assign(this.wardMode, {
             scheme: schemeObj, tab: "family", page: 0,
-            booth: "", street: "", search: "", otherSearch: "",
+            booth: "", street: "", search: "", searchType: "sl", otherSearch: "",
             unfilledOnly: false, deliveryFilter: "",
         });
 
         const wardDF = document.getElementById("ward-scheme-delivery-filter");
         if (wardDF) wardDF.value = "";
+        const wardST = document.getElementById("ward-scheme-search-type");
+        if (wardST) wardST.value = "sl";
+        const wardSI = document.getElementById("ward-scheme-search");
+        if (wardSI) { wardSI.value = ""; wardSI.placeholder = "Enter SL number..."; }
         content.style.display = "block";
         this._resetTabUI("#view-ward-scheme", "ward-scheme-family-panel", "ward-scheme-other-panel");
         this._bindWardTabs();
@@ -418,8 +445,8 @@ const Scheme = {
             : arr;
 
         const sf = state.scheme?._statusField || "coupon_status";
-        state.families = this._filterFams(byBooth(state.familiesAll), state.street, state.search, state.unfilledOnly, state.deliveryFilter, sf);
-        state.ungrouped = this._filterFams(byBooth(state.ungroupedAll), state.street, state.search, state.unfilledOnly, state.deliveryFilter, sf);
+        state.families = this._filterFams(byBooth(state.familiesAll), state.street, state.search, state.unfilledOnly, state.deliveryFilter, sf, state.searchType);
+        state.ungrouped = this._filterFams(byBooth(state.ungroupedAll), state.street, state.search, state.unfilledOnly, state.deliveryFilter, sf, state.searchType);
 
         if (state.tab === "family") this._renderWardFamilies();
         else this._renderWardOther();
@@ -469,12 +496,28 @@ const Scheme = {
         const search = c("ward-scheme-search");
         const booth  = c("ward-scheme-booth");
         const street = c("ward-scheme-street");
+        const searchType = c("ward-scheme-search-type");
 
-        if (search) search.addEventListener("input", () => {
-            this.wardMode.search = search.value;
-            this.wardMode.page = 0;
-            this._applyWardFilters();
-        });
+        const placeholders = { sl: "Enter SL number...", name: "Enter name...", door: "Enter door number...", epic: "Enter EPIC ID..." };
+
+        if (searchType) {
+            searchType.value = this.wardMode.searchType || "sl";
+            searchType.addEventListener("change", () => {
+                this.wardMode.searchType = searchType.value;
+                this.wardMode.search = "";
+                this.wardMode.page = 0;
+                if (search) { search.value = ""; search.placeholder = placeholders[searchType.value] || "Search..."; }
+                this._applyWardFilters();
+            });
+        }
+        if (search) {
+            search.placeholder = placeholders[this.wardMode.searchType] || "Search...";
+            search.addEventListener("input", () => {
+                this.wardMode.search = search.value;
+                this.wardMode.page = 0;
+                this._applyWardFilters();
+            });
+        }
         if (booth) booth.addEventListener("change", () => {
             this.wardMode.booth = booth.value;
             this.wardMode.street = "";
@@ -985,20 +1028,36 @@ const Scheme = {
         this._bindCardActions(area, mode);
     },
 
-    _filterFams(arr, street, search, unfilledOnly, deliveryFilter, statusField) {
+    _filterFams(arr, street, search, unfilledOnly, deliveryFilter, statusField, searchType) {
         let f = arr;
         if (street) f = f.filter(fam => fam.members.some(m => m.section === street));
         if (search) {
             const q = search.toLowerCase().trim();
-            f = f.filter(fam => fam.members.some(m =>
-                (m.sl || "").toLowerCase().includes(q) ||
-                (m.voter_id || "").toLowerCase().includes(q) ||
-                (m.name || "").toLowerCase().includes(q) ||
-                (m.name_en || "").toLowerCase().includes(q) ||
-                (m.name_ta || "").includes(q) ||
-                (m.section || "").toLowerCase().includes(q) ||
-                (fam.house || "").toLowerCase().includes(q)
-            ));
+            if (searchType === "sl") {
+                f = f.filter(fam => fam.members.some(m => (m.sl || "").toLowerCase() === q));
+            } else if (searchType === "name") {
+                f = f.filter(fam => fam.members.some(m =>
+                    (m.name || "").toLowerCase().includes(q) ||
+                    (m.name_en || "").toLowerCase().includes(q) ||
+                    (m.name_ta || "").includes(q) ||
+                    (m.name_seg || "").toLowerCase().includes(q)
+                ));
+            } else if (searchType === "door") {
+                f = f.filter(fam => (fam.house || "").toLowerCase().includes(q));
+            } else if (searchType === "epic") {
+                f = f.filter(fam => fam.members.some(m => (m.voter_id || "").toLowerCase().includes(q)));
+            } else {
+                // Fallback: search all fields (used by ward/admin modes)
+                f = f.filter(fam => fam.members.some(m =>
+                    (m.sl || "").toLowerCase().includes(q) ||
+                    (m.voter_id || "").toLowerCase().includes(q) ||
+                    (m.name || "").toLowerCase().includes(q) ||
+                    (m.name_en || "").toLowerCase().includes(q) ||
+                    (m.name_ta || "").includes(q) ||
+                    (m.section || "").toLowerCase().includes(q) ||
+                    (fam.house || "").toLowerCase().includes(q)
+                ));
+            }
         }
         if (unfilledOnly) {
             f = f.filter(fam => fam.members.some(m => !(m.phone_last4 || m.party_support)));
@@ -1137,7 +1196,7 @@ const Scheme = {
             ward: "", booth: "",
             familiesAll: [], families: [],
             ungroupedAll: [], ungrouped: [],
-            page: 0, search: "", otherSearch: "",
+            page: 0, search: "", searchType: "sl", otherSearch: "",
             unfilledOnly: false, deliveryFilter: "",
         });
 
@@ -1259,8 +1318,11 @@ const Scheme = {
         content.style.display    = "block";
         state.page        = 0;
         state.search      = "";
+        state.searchType  = "sl";
         const searchEl = document.getElementById("admin-scheme-search");
-        if (searchEl) searchEl.value = "";
+        if (searchEl) { searchEl.value = ""; searchEl.placeholder = "Enter SL number..."; }
+        const adminST = document.getElementById("admin-scheme-search-type");
+        if (adminST) adminST.value = "sl";
         this._resetTabUI("#view-admin-scheme", "admin-scheme-family-panel", "admin-scheme-other-panel");
 
         const def = this._def(state.scheme.id);
@@ -1280,8 +1342,8 @@ const Scheme = {
     _applyAdminFilters() {
         const state = this.adminMode;
         const sf = state.scheme?._statusField || "coupon_status";
-        state.families = this._filterFams(state.familiesAll, "", state.search, state.unfilledOnly, state.deliveryFilter, sf);
-        state.ungrouped = this._filterFams(state.ungroupedAll, "", state.search, state.unfilledOnly, state.deliveryFilter, sf);
+        state.families = this._filterFams(state.familiesAll, "", state.search, state.unfilledOnly, state.deliveryFilter, sf, state.searchType);
+        state.ungrouped = this._filterFams(state.ungroupedAll, "", state.search, state.unfilledOnly, state.deliveryFilter, sf, state.searchType);
         if (state.tab === "family") this._renderAdminFamilies();
         else this._renderAdminOther();
         this._refreshSummary("admin");
@@ -1323,6 +1385,9 @@ const Scheme = {
         const wardSel   = c("admin-scheme-ward");
         const boothSel  = c("admin-scheme-booth");
         const search = c("admin-scheme-search");
+        const searchType = c("admin-scheme-search-type");
+
+        const placeholders = { sl: "Enter SL number...", name: "Enter name...", door: "Enter door number...", epic: "Enter EPIC ID..." };
 
         if (schemeSel) schemeSel.addEventListener("change", () => this._onAdminSchemeChange(schemeSel.value));
         if (wardSel) wardSel.addEventListener("change", async () => {
@@ -1337,11 +1402,24 @@ const Scheme = {
             this.adminMode.booth = boothSel.value;
             await this._loadAdminData();
         });
-        if (search) search.addEventListener("input", () => {
-            this.adminMode.search = search.value;
-            this.adminMode.page   = 0;
-            this._applyAdminFilters();
-        });
+        if (searchType) {
+            searchType.value = this.adminMode.searchType || "sl";
+            searchType.addEventListener("change", () => {
+                this.adminMode.searchType = searchType.value;
+                this.adminMode.search = "";
+                this.adminMode.page = 0;
+                if (search) { search.value = ""; search.placeholder = placeholders[searchType.value] || "Search..."; }
+                this._applyAdminFilters();
+            });
+        }
+        if (search) {
+            search.placeholder = placeholders[this.adminMode.searchType] || "Search...";
+            search.addEventListener("input", () => {
+                this.adminMode.search = search.value;
+                this.adminMode.page   = 0;
+                this._applyAdminFilters();
+            });
+        }
 
         this._bindUnfilledToggle("btn-admin-scheme-unfilled", this.adminMode, () => this._applyAdminFilters());
         this._bindDeliveryFilter("admin-scheme-delivery-filter", this.adminMode, () => this._applyAdminFilters());
@@ -1638,10 +1716,11 @@ const Scheme = {
         const phonePart = m.phone_last4 ? `<span class="ncc-name-phone">${phoneIconO} ******${this._esc(m.phone_last4)}</span>` : "";
         html += `<span class="ncc-name">${this._hl(dispName, q)}${dataBadge}${ageParts ? ` <span class="ncc-name-meta">${this._esc(ageParts)}</span>` : ""}${phonePart}</span>`;
 
-        // Line 2: SL + EPIC + Section + Relation (all merged)
+        // Line 2: SL + EPIC + Door No + Section + Relation (all merged)
         const line2 = [];
         if (m.sl) line2.push(`${I18n.t("sl_no")} ${this._hl(m.sl, q)}`);
         if (m.voter_id) line2.push(`${I18n.t("id_label")} <span class="ncc-epic">${this._hl(m.voter_id, q)}</span>`);
+        if (m.house) line2.push(`<span class="ncc-house-inline">${this._hl(m.house, q)}</span>`);
         const memStreet = m.section || "";
         if (memStreet) line2.push(this._esc(memStreet));
         const relNameO = isTa ? (m.relation_name_ta || m.relation_name || "") : (m.relation_name || "");

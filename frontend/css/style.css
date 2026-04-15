@@ -451,6 +451,12 @@ body {
     font-weight: 700;
     white-space: nowrap;
 }
+.ncc-house-inline {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-right: 2px;
+}
 .ncc-count {
     font-size: 0.75rem;
     color: var(--text-muted);

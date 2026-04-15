@@ -550,13 +550,21 @@
                         <div id="booth-scheme-summary" class="notice-summary-bar"></div>
                         <div class="filter-bar" style="display:flex;gap:8px;">
                             <select id="booth-scheme-street" class="select-field" style="flex:1;"><option value="" data-i18n="all_streets">All Streets</option></select>
-                            <input id="booth-scheme-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search name, SL, EPIC or House No…" autocomplete="off" style="flex:1;"/>
                             <select id="booth-scheme-delivery-filter" class="select-field" style="width:auto;padding:6px 8px;font-size:0.8rem;">
                                 <option value="">All</option>
                                 <option value="delivered">Delivered</option>
                                 <option value="not_delivered">Not Delivered</option>
                             </select>
                             <button id="btn-booth-scheme-unfilled" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 12px;">All</button>
+                        </div>
+                        <div class="filter-bar" style="display:flex;gap:8px;">
+                            <select id="booth-scheme-search-type" class="select-field" style="width:auto;padding:6px 8px;font-size:0.8rem;">
+                                <option value="sl">SL No</option>
+                                <option value="name">Name</option>
+                                <option value="door">Door No</option>
+                                <option value="epic">EPIC</option>
+                            </select>
+                            <input id="booth-scheme-search" class="select-field" type="search" placeholder="Enter SL number..." autocomplete="off" style="flex:1;"/>
                         </div>
                         <div class="tabs">
                             <button class="tab active" data-scheme-tab="family" data-i18n="family">Family</button>
@@ -717,13 +725,21 @@
                             <select id="ward-scheme-street" class="select-field" style="flex:1;"><option value="" data-i18n="all_streets">All Streets</option></select>
                         </div>
                         <div class="filter-bar" style="display:flex;gap:8px;">
-                            <input id="ward-scheme-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search name, SL, EPIC or House No…" autocomplete="off" style="flex:1;"/>
                             <select id="ward-scheme-delivery-filter" class="select-field" style="width:auto;padding:6px 8px;font-size:0.8rem;">
                                 <option value="">All</option>
                                 <option value="delivered">Delivered</option>
                                 <option value="not_delivered">Not Delivered</option>
                             </select>
                             <button id="btn-ward-scheme-unfilled" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 12px;">All</button>
+                        </div>
+                        <div class="filter-bar" style="display:flex;gap:8px;">
+                            <select id="ward-scheme-search-type" class="select-field" style="width:auto;padding:6px 8px;font-size:0.8rem;">
+                                <option value="sl">SL No</option>
+                                <option value="name">Name</option>
+                                <option value="door">Door No</option>
+                                <option value="epic">EPIC</option>
+                            </select>
+                            <input id="ward-scheme-search" class="select-field" type="search" placeholder="Enter SL number..." autocomplete="off" style="flex:1;"/>
                         </div>
                         <div class="tabs">
                             <button class="tab active" data-scheme-tab="family" data-i18n="family">Family</button>
@@ -792,13 +808,21 @@
                     <div id="admin-scheme-content" style="display:none;">
                         <div id="admin-scheme-summary" class="notice-summary-bar"></div>
                         <div class="filter-bar" style="display:flex;gap:8px;">
-                            <input id="admin-scheme-search" class="select-field" type="search" data-i18n="search_placeholder" placeholder="Search name, SL, EPIC or House No…" autocomplete="off" style="flex:1;"/>
                             <select id="admin-scheme-delivery-filter" class="select-field" style="width:auto;padding:6px 8px;font-size:0.8rem;">
                                 <option value="">All</option>
                                 <option value="delivered">Delivered</option>
                                 <option value="not_delivered">Not Delivered</option>
                             </select>
                             <button id="btn-admin-scheme-unfilled" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 12px;">All</button>
+                        </div>
+                        <div class="filter-bar" style="display:flex;gap:8px;">
+                            <select id="admin-scheme-search-type" class="select-field" style="width:auto;padding:6px 8px;font-size:0.8rem;">
+                                <option value="sl">SL No</option>
+                                <option value="name">Name</option>
+                                <option value="door">Door No</option>
+                                <option value="epic">EPIC</option>
+                            </select>
+                            <input id="admin-scheme-search" class="select-field" type="search" placeholder="Enter SL number..." autocomplete="off" style="flex:1;"/>
                         </div>
                         <div class="tabs">
                             <button class="tab active" data-scheme-tab="family" data-i18n="family">Family</button>

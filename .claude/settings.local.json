@@ -22,7 +22,13 @@
       "mcp__plugin_playwright_playwright__browser_type",
       "Bash(curl -s -X POST http://localhost:8001/api/auth/login-pin -H \"Content-Type: application/json\" -d '{\"\"phone\"\":\"\"8903429890\"\",\"\"pin\"\":\"\"2304\"\"}')",
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaG9uZSI6Ijg5MDM0Mjk4OTAiLCJyb2xlIjoic3VwZXJhZG1pbiIsIndhcmQiOiIiLCJib290aCI6IiIsIm5hbWUiOiJZb3VyIE5hbWUiLCJleHAiOjE3NzYzMTgzODEsImlhdCI6MTc3NjIzMTk4MX0.6hVq-ENkIJBI-V6Kr4ZJSvyJ9oS-mR-cIWjXN3eKiIE\")",
-      "Bash(curl -s -b \"session_token=$TOKEN\" http://localhost:8001/api/dashboard/division-map)"
+      "Bash(curl -s -b \"session_token=$TOKEN\" http://localhost:8001/api/dashboard/division-map)",
+      "Bash(tasklist //FI \"PID eq 60032\" //FO CSV)",
+      "Bash(tasklist //FI \"PID eq 25452\" //FO CSV)",
+      "Bash(tasklist //FI \"PID eq 33948\" //FO CSV)",
+      "Bash(curl -s http://localhost:8080/js/mini-charts.js)",
+      "Bash(curl -s http://localhost:8080/js/schemes.js)",
+      "Bash(curl -s http://localhost:8080/)"
     ]
   }
 }
