@@ -97,7 +97,7 @@ async def get_booth_families(request: Request, ward: str, booth: str, street: st
     statuses = storage.get_all_call_statuses(ward, booth)
 
     if street:
-        voters = [v for v in voters if v.get("section", "") == street]
+        voters = [v for v in voters if storage.street_key(v) == street]
 
     families = {}
     for v in voters:
@@ -118,7 +118,7 @@ async def get_booth_families(request: Request, ward: str, booth: str, street: st
                 "famcode": famcode,
                 "members": [],
                 "house": v.get("house", ""),
-                "section": v.get("section", ""),
+                "section": storage.street_key(v),
                 "booth_name": v.get("booth_name", ""),
                 "booth_name_tamil": v.get("booth_name_tamil", ""),
                 "booth_number": v.get("booth_number", ""),
@@ -235,7 +235,7 @@ async def get_ward_pending_status(request: Request, ward: str, booth: str):
                 "voter_id": voter_id,
                 "name": voter.get("name", ""),
                 "famcode": voter.get("famcode", voter_id),
-                "section": voter.get("section", ""),
+                "section": storage.street_key(voter),
                 "house": voter.get("house", ""),
                 "booth": booth,
             })

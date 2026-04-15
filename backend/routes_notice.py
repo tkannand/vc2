@@ -52,7 +52,7 @@ def sanitize_notice_voter(voter: dict) -> dict:
         "famcode":         voter.get("famcode", ""),
         "is_head":         voter.get("is_head", "No"),
         "house":           voter.get("house", ""),
-        "section":         voter.get("section", ""),
+        "section":         storage.street_key(voter),
         "section_ta":      voter.get("section_name_ta", ""),
         "sl":              voter.get("sl", ""),
         "booth":           voter.get("booth", ""),
@@ -88,7 +88,7 @@ async def get_notice_voters(request: Request, ward: str, booth: str, street: str
     statuses = storage.get_all_notice_statuses(ward, booth)
 
     if street:
-        voters = [v for v in voters if v.get("section", "") == street]
+        voters = [v for v in voters if storage.street_key(v) == street]
 
     # Group by family
     families = {}
@@ -190,13 +190,10 @@ async def get_notice_stats(request: Request, ward: str, booth: str):
 
     # Section breakdown — derived from already-fetched voters, no extra queries
     sections_set: dict = {}
-    section_ta_map: dict = {}  # section_name -> section_name_ta
     for v in voters:
-        sec = v.get("section", "")
-        if sec:
-            sections_set.setdefault(sec, []).append(v)
-            if sec not in section_ta_map:
-                section_ta_map[sec] = v.get("section_name_ta", "")
+        k = storage.street_key(v)
+        if k:
+            sections_set.setdefault(k, []).append(v)
 
     section_stats = []
     for section in sorted(sections_set.keys()):
@@ -208,7 +205,6 @@ async def get_notice_stats(request: Request, ward: str, booth: str):
         )
         section_stats.append({
             "section": section,
-            "section_ta": section_ta_map.get(section, ""),
             "total": sec_total,
             "delivered": sec_delivered,
             "pending": sec_total - sec_delivered,
@@ -337,7 +333,7 @@ async def get_ward_notice_booth_voters(request: Request, ward: str, booth: str, 
     statuses = storage.get_all_notice_statuses(ward, booth)
 
     if street:
-        voters = [v for v in voters if v.get("section", "") == street]
+        voters = [v for v in voters if storage.street_key(v) == street]
 
     families = {}
     ungrouped = []

@@ -457,8 +457,7 @@ const Admin = {
                 <select id="scope-street-sel" class="select-field select-sm">
                     <option value="">All Streets</option>
                     ${(items || []).map(s => {
-                        const secLabel = (I18n.currentLang === "ta" && s.section_ta) ? s.section_ta : s.section;
-                        return `<option value="${this._escAttr(s.section)}">${Booth.escHtml(secLabel)}</option>`;
+                        return `<option value="${this._escAttr(s.section)}">${Booth.escHtml(s.section)}</option>`;
                     }).join("")}
                 </select>`;
             bar.style.display = "";
@@ -527,8 +526,7 @@ const Admin = {
             if (streetSel) {
                 streetSel.innerHTML = `<option value="">All Streets</option>` +
                     (drillRes.items || []).map(s => {
-                        const secLabel = (I18n.currentLang === "ta" && s.section_ta) ? s.section_ta : s.section;
-                        return `<option value="${this._escAttr(s.section)}">${Booth.escHtml(secLabel)}</option>`;
+                        return `<option value="${this._escAttr(s.section)}">${Booth.escHtml(s.section)}</option>`;
                     }).join("");
                 streetSel.style.display = "inline-block";
                 streetSel.value = "";
@@ -926,7 +924,7 @@ const Admin = {
     },
 
     _geoLabel(item) {
-        if (this._drillBooth) return (I18n.currentLang === "ta" && item.section_ta) ? item.section_ta : item.section;   // street level
+        if (this._drillBooth) return item.section;   // street level
         if (this._drillWard)  return item.booth_number ? `#${item.booth_number}` : item.booth;
         return item.ward;
     },

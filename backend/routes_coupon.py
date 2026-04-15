@@ -62,7 +62,7 @@ def sanitize_coupon_voter(voter: dict) -> dict:
         "famcode":          voter.get("famcode", ""),
         "is_head":          voter.get("is_head", "No"),
         "house":            voter.get("house", ""),
-        "section":          voter.get("section", ""),
+        "section":          storage.street_key(voter),
         "section_ta":       voter.get("section_name_ta", ""),
         "sl":               voter.get("sl", ""),
         "booth":            voter.get("booth", ""),
@@ -97,7 +97,7 @@ def _build_coupon_families(voters: list, custom_families: list, coupon_statuses:
         if famcode not in nat_families:
             nat_families[famcode] = {
                 "famcode": famcode, "members": [],
-                "house": v.get("house", ""), "section": v.get("section", ""), "section_ta": v.get("section_name_ta", ""),
+                "house": v.get("house", ""), "section": storage.street_key(v), "section_ta": v.get("section_name_ta", ""),
                 "head_name": "", "head_name_ta": "",
                 "is_custom": False,
             }
@@ -170,7 +170,7 @@ def _build_coupon_families(voters: list, custom_families: list, coupon_statuses:
             "members":      [member],
             "member_count": 1,
             "house":        v.get("house", ""),
-            "section":      v.get("section", ""),
+            "section":      storage.street_key(v),
             "head_name":    v.get("name_en") or v.get("name", ""),
             "head_name_ta": v.get("name_ta", ""),
             "is_custom":    False,        # so Other tab logic catches it

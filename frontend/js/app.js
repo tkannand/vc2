@@ -401,6 +401,14 @@ const App = {
             }
         } catch(e) {}
 
+        // Booth home — refresh street filters + stats labels from cache
+        try {
+            if (v === "view-booth-home") {
+                Booth.refreshLanguage();
+                return;
+            }
+        } catch(e) {}
+
         // Telecaller / Booth calling — re-render card in-place
         try {
             if (Telecaller.families && Telecaller.families.length > 0) {
@@ -411,6 +419,7 @@ const App = {
         try {
             if (Booth.families && Booth.families.length > 0) {
                 Booth.refreshCardLanguage();
+                Booth.refreshLanguage();
                 Booth.renderFamily();
                 return;
             }

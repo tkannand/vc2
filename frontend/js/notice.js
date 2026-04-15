@@ -97,12 +97,9 @@ const Notice = {
 
         // Populate street filter
         const streetSel = document.getElementById("booth-notice-street-filter");
-        const streetMap = {};
-        families.forEach(f => f.members.forEach(m => { if (m.section && !streetMap[m.section]) streetMap[m.section] = m.section_ta || ""; }));
-        const streets = Object.keys(streetMap).sort();
+        const streets = [...new Set(families.flatMap(f => f.members.map(m => m.section)).filter(Boolean))].sort();
         streetSel.innerHTML = `<option value="">All Streets</option>`;
-        const isTa = I18n.currentLang === "ta";
-        streets.forEach(s => { const o = document.createElement("option"); o.value = s; o.textContent = (isTa && streetMap[s]) ? streetMap[s] : s; streetSel.appendChild(o); });
+        streets.forEach(s => { const o = document.createElement("option"); o.value = s; o.textContent = s; streetSel.appendChild(o); });
 
         this._updateBoothNoticeSummary(res.delivered, res.total);
         this._applyBoothNoticeFilters();
@@ -336,7 +333,7 @@ const Notice = {
             streetList.innerHTML = res.sections.map((s) => `
                 <div class="street-stat-row">
                     <div class="stat-row-top">
-                        <span class="stat-row-name">${(isTa && s.section_ta) ? s.section_ta : s.section}</span>
+                        <span class="stat-row-name">${s.section}</span>
                         <span class="stat-row-pct">${s.pct}%</span>
                     </div>
                     <div class="progress-bar-container">
@@ -472,16 +469,12 @@ const Notice = {
 
         // Update street options when booth changes
         if (booth) {
-            const streetMap = {};
-            this.wardNoticeFamiliesAll
-                .filter((f) => f.booth === booth)
-                .forEach(f => f.members.forEach(m => { if (m.section && !streetMap[m.section]) streetMap[m.section] = m.section_ta || ""; }));
-            const streets = Object.keys(streetMap).sort();
+            const boothFams = this.wardNoticeFamiliesAll.filter((f) => f.booth === booth);
+            const streets = [...new Set(boothFams.flatMap(f => f.members.map(m => m.section)).filter(Boolean))].sort();
             const streetSel = document.getElementById("ward-notice-street-filter");
             const cur = streetSel.value;
-            const isTa = I18n.currentLang === "ta";
             streetSel.innerHTML = `<option value="">All Streets</option>`;
-            streets.forEach((s) => { const o = document.createElement("option"); o.value = s; o.textContent = (isTa && streetMap[s]) ? streetMap[s] : s; streetSel.appendChild(o); });
+            streets.forEach((s) => { const o = document.createElement("option"); o.value = s; o.textContent = s; streetSel.appendChild(o); });
             if (streets.includes(cur)) streetSel.value = cur;
         }
     },
@@ -580,9 +573,7 @@ const Notice = {
         const members = fam.members || [];
         const deliveredCount = members.filter(m => m.status === "delivered").length;
         const allDelivered = deliveredCount === members.length;
-        const sectionEn = members[0]?.section || "";
-        const sectionTa = members[0]?.section_ta || "";
-        const section = (isTamil && sectionTa) ? sectionTa : sectionEn;
+        const section = members[0]?.section || "";
 
         let html = `<div class="family-card ncc">`;
 
@@ -1141,7 +1132,7 @@ const Notice = {
                 const headName = this.escapeHtml(
                     isTamil ? (fam.head_name_ta || fam.head_name || "Family") : (fam.head_name || "Family")
                 );
-                const sectionRaw = fam.members.length > 0 ? ((isTamil && fam.members[0].section_ta) ? fam.members[0].section_ta : (fam.members[0].section || "")) : "";
+                const sectionRaw = fam.members.length > 0 ? (fam.members[0].section || "") : "";
                 const section = this.escapeHtml(sectionRaw);
 
                 html += `<div class="notice-family-group">`;

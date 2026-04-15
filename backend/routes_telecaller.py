@@ -53,8 +53,9 @@ async def get_telecaller_streets(request: Request, ward: str, booth: str = ""):
     sections_set = set()
     for voters in voters_per_booth:
         for v in voters:
-            if v.get("seg_synced") == "true" and v.get("section"):
-                sections_set.add(v["section"])
+            k = storage.street_key(v)
+            if v.get("seg_synced") == "true" and k:
+                sections_set.add(k)
     return {"streets": sorted(list(sections_set))}
 
 
@@ -108,7 +109,7 @@ async def get_telecaller_families(
         voters = [v for v in voters if v.get("seg_synced") == "true"]
 
         if street:
-            voters = [v for v in voters if v.get("section", "") == street]
+            voters = [v for v in voters if storage.street_key(v) == street]
 
         for v in voters:
             vid = v.get("RowKey", "")
@@ -131,7 +132,7 @@ async def get_telecaller_families(
                     "booth": b,
                     "members": [],
                     "house": v.get("house", ""),
-                    "section": v.get("section", ""),
+                    "section": storage.street_key(v),
                     "booth_name": v.get("booth_name", ""),
                     "booth_name_tamil": v.get("booth_name_tamil", ""),
                     "booth_number": v.get("booth_number", ""),
@@ -199,7 +200,7 @@ async def get_telecaller_pending_status(request: Request, ward: str):
                     "voter_id": voter_id,
                     "name": voter.get("name", ""),
                     "famcode": voter.get("famcode", voter_id),
-                    "section": voter.get("section", ""),
+                    "section": storage.street_key(voter),
                     "house": voter.get("house", ""),
                     "booth": b,
                 }],

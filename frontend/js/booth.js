@@ -120,14 +120,22 @@ const Booth = {
         const data = await API.getStreets(user.ward, user.booth);
         if (data.error) return;
 
+        this._cachedStreets = data.streets || [];
+        this._renderStreetFilter();
+    },
+
+    _renderStreetFilter() {
         const sel = document.getElementById("booth-street-filter");
+        if (!sel) return;
+        const prev = sel.value;
         sel.innerHTML = `<option value="">${I18n.t("all_streets")}</option>`;
-        (data.streets || []).forEach((s) => {
+        (this._cachedStreets || []).forEach((s) => {
             const opt = document.createElement("option");
             opt.value = s;
             opt.textContent = s;
             sel.appendChild(opt);
         });
+        if (prev) sel.value = prev;
     },
 
     async loadFamilies() {
@@ -210,7 +218,7 @@ const Booth = {
                     <div>
                         <div class="family-head-name">${this.escHtml(I18n.t("house"))}: ${this.escHtml(fam.house || "-")}</div>
                         <div class="family-meta">
-                            <span>${this.escHtml((I18n.currentLang === "ta" && fam.section_ta) ? fam.section_ta : (fam.section || ""))}</span>
+                            <span>${this.escHtml(fam.section || "")}</span>
                             ${boothLabel ? `<span>${this.escHtml(boothLabel)}</span>` : ""}
                         </div>
                     </div>
@@ -478,18 +486,7 @@ const Booth = {
 
         this._cachedStats = data;
 
-        // Populate home street filter
-        const sel = document.getElementById("booth-home-street-filter");
-        if (sel) {
-            sel.innerHTML = `<option value="">${I18n.t("all_streets")}</option>`;
-            const isTa = I18n.currentLang === "ta";
-            (data.sections || []).forEach((s) => {
-                const opt = document.createElement("option");
-                opt.value = s.section;
-                opt.textContent = (isTa && s.section_ta) ? s.section_ta : s.section;
-                sel.appendChild(opt);
-            });
-        }
+        this._renderHomeStreetFilter();
 
         this.renderStatCards(data);
         this.renderStreetList(data.sections || []);
@@ -523,11 +520,10 @@ const Booth = {
 
     renderStreetList(sections) {
         const streetList = document.getElementById("booth-street-stats");
-        const isTa = I18n.currentLang === "ta";
         streetList.innerHTML = sections.map((s) => `
             <div class="street-stat-row">
                 <div class="stat-row-top">
-                    <span class="stat-row-name">${this.escHtml((isTa && s.section_ta) ? s.section_ta : s.section)}</span>
+                    <span class="stat-row-name">${this.escHtml(s.section)}</span>
                     <span class="stat-row-pct">${s.pct}%</span>
                 </div>
                 <div class="progress-bar-container"><div class="progress-bar" style="width:${s.pct}%"></div></div>
@@ -560,6 +556,28 @@ const Booth = {
             completion_pct: pct,
         });
         this.renderStreetList([sec]);
+    },
+
+    _renderHomeStreetFilter() {
+        const sel = document.getElementById("booth-home-street-filter");
+        if (!sel || !this._cachedStats) return;
+        const prev = sel.value;
+        sel.innerHTML = `<option value="">${I18n.t("all_streets")}</option>`;
+        (this._cachedStats.sections || []).forEach((s) => {
+            const opt = document.createElement("option");
+            opt.value = s.section;
+            opt.textContent = s.section;
+            sel.appendChild(opt);
+        });
+        if (prev) sel.value = prev;
+    },
+
+    refreshLanguage() {
+        this._renderStreetFilter();
+        this._renderHomeStreetFilter();
+        if (this._cachedStats) {
+            this.renderStreetList(this._cachedStats.sections || []);
+        }
     },
 
     escHtml(str) {

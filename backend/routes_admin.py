@@ -622,7 +622,7 @@ async def get_summary(
             else: age_bkts["61_plus"] += 1
         # Streets and booths from the same projection data
         total_streets = len(set(
-            v.get("section", "") for v in scope_famcodes if v.get("section", "")
+            storage.street_key(v) for v in scope_famcodes if storage.street_key(v)
         ))
         # Unique booth values exist only in ward-level scans (not single-booth scans)
         total_booths = len(set(
@@ -738,13 +738,10 @@ async def get_drill(request: Request, ward: str, booth: str = ""):
         notice_by_sec: dict  = {}
         coupon_by_sec: dict  = {}
         scheme_by_sec: dict  = {sc["id"]: {} for sc in custom_schemes}
-        section_ta_map: dict = {}  # section -> section_name_ta
         demo_by_sec: dict    = {}  # per-section demographics
 
         for v in voters:
-            section = (v.get("section") or v.get("section_name") or "Unknown").strip()
-            if section not in section_ta_map:
-                section_ta_map[section] = (v.get("section_name_ta") or "").strip()
+            section = (storage.street_key(v) or "Unknown").strip()
             vid     = v.get("voter_id") or v.get("RowKey", "")
 
             # Demographics: gender, age, surveyed, families — all voters
@@ -831,7 +828,6 @@ async def get_drill(request: Request, ward: str, booth: str = ""):
             c["completion_pct"] = round(c["called"] / c["total"] * 100 if c["total"] else 0, 1)
             item = {
                 "section":          s,
-                "section_ta":       section_ta_map.get(s, ""),
                 **c,
                 "notice_total":     n["total"],
                 "notice_delivered": n["delivered"],

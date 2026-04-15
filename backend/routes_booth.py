@@ -24,7 +24,7 @@ def sanitize_voter(voter: dict, include_masked_phone: bool = True) -> dict:
         "famcode": voter.get("famcode", ""),
         "is_head": voter.get("is_head", "No"),
         "party_support": voter.get("party_support", ""),
-        "section": voter.get("section", ""),
+        "section": storage.street_key(voter),
         "section_ta": voter.get("section_name_ta", ""),
         "booth": voter.get("booth", ""),
         "ward": voter.get("ward", ""),
@@ -87,7 +87,7 @@ async def get_families(request: Request, ward: str, booth: str, street: str = ""
     statuses = storage.get_all_call_statuses(ward, booth)
 
     if street:
-        voters = [v for v in voters if v.get("section", "") == street]
+        voters = [v for v in voters if storage.street_key(v) == street]
 
     families = {}
     for v in voters:
@@ -108,7 +108,7 @@ async def get_families(request: Request, ward: str, booth: str, street: str = ""
                 "famcode": famcode,
                 "members": [],
                 "house": v.get("house", ""),
-                "section": v.get("section", ""),
+                "section": storage.street_key(v),
                 "section_ta": v.get("section_name_ta", ""),
                 "booth_name": v.get("booth_name", ""),
                 "booth_name_tamil": v.get("booth_name_tamil", ""),
@@ -250,7 +250,7 @@ async def get_pending_status(request: Request, ward: str, booth: str):
                 "voter_id": voter_id,
                 "name": voter.get("name", ""),
                 "famcode": voter.get("famcode", voter_id),
-                "section": voter.get("section", ""),
+                "section": storage.street_key(voter),
                 "house": voter.get("house", ""),
             })
     return {"pending": voters_info, "has_pending": len(voters_info) > 0}
@@ -268,9 +268,8 @@ async def get_stats(request: Request, ward: str, booth: str):
     voters = storage.get_voters_by_booth(ward, booth)
     statuses = storage.get_all_call_statuses(ward, booth)
 
-    for sec_info in sections:
-        sec_name = sec_info["section"]
-        sec_voters = [v for v in voters if v.get("section") == sec_name]
+    for sec_name in sections:
+        sec_voters = [v for v in voters if storage.street_key(v) == sec_name]
         sec_total = len(sec_voters)
         sec_called = 0
         sec_other = 0
@@ -283,7 +282,6 @@ async def get_stats(request: Request, ward: str, booth: str):
                 sec_other += 1
         section_stats.append({
             "section": sec_name,
-            "section_ta": sec_info.get("section_ta", ""),
             "total": sec_total,
             "called": sec_called,
             "not_called": sec_total - sec_called - sec_other,

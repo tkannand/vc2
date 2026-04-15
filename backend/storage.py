@@ -628,15 +628,20 @@ def get_booths_for_ward(ward: str) -> list:
     return sorted(list(booths))
 
 
+def street_key(voter: dict) -> str:
+    """Primary street key: Tamil name if available, else English."""
+    return voter.get("section_name_ta", "") or voter.get("section", "")
+
+
 def get_sections_for_booth(ward: str, booth: str) -> list:
-    """Return sorted list of {section, section_ta} dicts for a booth."""
+    """Return sorted list of unique street names (Tamil-first) for a booth."""
     voters = get_voters_by_booth(ward, booth)
-    sections: dict = {}  # section_name -> section_name_ta
+    seen: set = set()
     for v in voters:
-        s = v.get("section", "")
-        if s and s not in sections:
-            sections[s] = v.get("section_name_ta", "")
-    return [{"section": s, "section_ta": sections[s]} for s in sorted(sections.keys())]
+        k = street_key(v)
+        if k:
+            seen.add(k)
+    return sorted(seen)
 
 
 def get_voter_count() -> int:
@@ -1062,9 +1067,9 @@ def get_notice_streets(ward: str, booth: str) -> list:
     voters = get_notice_voters_by_booth(ward, booth)
     sections = set()
     for v in voters:
-        s = v.get("section", "")
-        if s:
-            sections.add(s)
+        k = street_key(v)
+        if k:
+            sections.add(k)
     return sorted(list(sections))
 
 
@@ -1376,7 +1381,7 @@ def sanitize_voter_for_coupon(voter: dict) -> dict:
         "name_ta":          voter.get("name_ta", ""),
         "sl":               voter.get("sl", ""),
         "booth":            voter.get("booth", ""),
-        "section":          voter.get("section", ""),
+        "section":          street_key(voter),
         "section_ta":       voter.get("section_name_ta", ""),
         "house":            voter.get("house", ""),
         "famcode":          voter.get("famcode", ""),

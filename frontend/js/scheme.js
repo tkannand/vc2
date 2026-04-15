@@ -503,6 +503,7 @@ const Scheme = {
         const members = fam.members || [];
         const deliveredCount = members.filter(m => m[sf] === "delivered").length;
         const allDelivered = deliveredCount === members.length;
+        const isTa = I18n.currentLang === "ta";
         const q = query || "";
 
         let html = `<div class="family-card ncc">`;
@@ -511,7 +512,8 @@ const Scheme = {
         html += `<div class="ncc-header"><div class="ncc-header-left">`;
         html += `<span class="ncc-house">🏠 ${this._esc(fam.house || "-")}</span>`;
         if (!isSingle) html += `<span class="ncc-count">(${members.length})</span>`;
-        if (fam.section) html += `<span class="ncc-section">${this._hl(fam.section, q)}</span>`;
+        const famStreet = fam.section || "";
+        if (famStreet) html += `<span class="ncc-section">${this._hl(famStreet, q)}</span>`;
         if (!isSingle && deliveredCount > 0) {
             html += `<span class="ncc-progress ${allDelivered ? "ncc-progress-full" : ""}">
                 ${deliveredCount}/${members.length} ✓</span>`;
@@ -1545,7 +1547,8 @@ const Scheme = {
         const line2 = [];
         if (m.sl) line2.push(`${I18n.t("sl_no")} ${this._hl(m.sl, q)}`);
         if (m.voter_id) line2.push(`${I18n.t("id_label")} <span class="ncc-epic">${this._hl(m.voter_id, q)}</span>`);
-        if (m.section) line2.push(this._esc(m.section));
+        const memStreet = m.section || "";
+        if (memStreet) line2.push(this._esc(memStreet));
         const relNameO = isTa ? (m.relation_name_ta || m.relation_name || "") : (m.relation_name || "");
         if (m.relation_type || relNameO) line2.push(this._esc([m.relation_type, relNameO].filter(Boolean).join(" ")));
         if (line2.length) html += `<span class="ncc-sl">${line2.join(" · ")}</span>`;
@@ -2153,11 +2156,22 @@ const Scheme = {
         const v = App.currentView;
         if (v === "view-booth-scheme") {
             if (this.boothMode.scheme) {
+                const streets = this._extractStreets([...this.boothMode.familiesAll, ...this.boothMode.ungroupedAll]);
+                this._fillStreetSel("booth-scheme-street", streets);
+                this._fillStreetSel("booth-scheme-other-street", streets);
+                if (this.boothMode.street) document.getElementById("booth-scheme-street").value = this.boothMode.street;
+                if (this.boothMode.otherStreet) document.getElementById("booth-scheme-other-street").value = this.boothMode.otherStreet;
                 if (this.boothMode.tab === "family") this._renderBoothFamilies();
                 else this._renderBoothOther();
             }
         } else if (v === "view-ward-scheme") {
             if (this.wardMode.scheme) {
+                const src = [...(this.wardMode.familiesAll || []), ...(this.wardMode.ungroupedAll || [])];
+                if (src.length) {
+                    const streets = this._extractStreets(src);
+                    this._fillStreetSel("ward-scheme-street", streets);
+                    if (this.wardMode.street) document.getElementById("ward-scheme-street").value = this.wardMode.street;
+                }
                 if (this.wardMode.tab === "family") this._renderWardFamilies();
                 else this._renderWardOther();
             }
