@@ -3897,3 +3897,60 @@ mark.search-hl {
     color: var(--warning);
     font-weight: 500;
 }
+
+/* ── Switch Ward Button ── */
+.btn-switch-ward {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+    font-family: var(--font);
+}
+.btn-switch-ward:hover { background: rgba(255, 255, 255, 0.2); }
+.btn-switch-ward:active { opacity: 0.7; }
+
+/* ── Switch Ward Modal ── */
+#switch-ward-modal .role-select-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#switch-ward-modal .role-select-btn.switch-current {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    opacity: 0.7;
+    cursor: default;
+}
+
+.switch-current-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.switch-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 0;
+    gap: 16px;
+}
+.switch-loading p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}

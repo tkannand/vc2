@@ -338,6 +338,7 @@ const Auth = {
     handleLoginSuccess(result) {
         // Multi-role: show role picker
         if (result.multi_role && result.roles) {
+            localStorage.setItem("vc_user_roles", JSON.stringify(result.roles));
             this.showRolePicker(result.roles);
             return;
         }
@@ -412,6 +413,7 @@ const Auth = {
 
     async logout() {
         await API.logout();
+        localStorage.removeItem("vc_user_roles");
         App.clearUser();
         this.resetForm();
         App.showAuthFlow();

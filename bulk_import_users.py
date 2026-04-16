@@ -1,5 +1,5 @@
 """
-Script to import/update booth workers from 'Userphone.xlsx' into Azure Table Storage.
+Script to import/update booth workers from 'new users.xlsx' into Azure Table Storage.
 
 Usage:
     python bulk_import_users.py
@@ -32,7 +32,7 @@ def clean_phone(raw_phone: str) -> str:
 
 
 def main():
-    excel_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Userphone.xlsx")
+    excel_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "new users.xlsx")
     if not os.path.exists(excel_path):
         print(f"ERROR: Excel file not found at {excel_path}")
         sys.exit(1)
@@ -40,15 +40,17 @@ def main():
     wb = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
     ws = wb["Sheet1"]
 
-    # Columns: A=Booth, B=Phone, C=Ward, D=Name, E=Ward, F=Booth
+    # Columns: A=S.NO, B=Name, C=Phone, D=Voter ID, E=People Role, F=Ward, G=Booth, H=Division
     rows = []
     for i, row in enumerate(ws.iter_rows(values_only=True)):
         if i == 0:
             continue  # skip header
-        raw_phone = str(row[1]).strip() if row[1] else ""
-        name = str(row[3]).strip() if row[3] else ""
-        ward = str(row[4]).strip() if row[4] else ""
-        booth = str(row[5]).strip() if row[5] else ""
+        if all(cell is None or str(cell).strip() == "" for cell in row):
+            break
+        name = str(row[1]).strip() if row[1] else ""
+        raw_phone = str(row[2]).strip() if row[2] else ""
+        ward = str(row[5]).strip() if row[5] else ""
+        booth = str(row[6]).strip() if row[6] else ""
 
         if not raw_phone or not name:
             print(f"  SKIP row {i+1}: missing phone or name")
