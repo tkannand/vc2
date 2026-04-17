@@ -579,8 +579,8 @@ const Scheme = {
                 html += `<button class="btn ${allDelivered ? "btn-success" : "btn-secondary"} btn-sm scheme-deliver-all"
                     data-famcode="${this._esc(fam.famcode)}">${allDelivered ? I18n.t("undeliver_all") : I18n.t("deliver_all")}</button>`;
             }
-        } else {
-            // Family-level deliver button
+        } else if (scheme.id !== "coupon") {
+            // Family-level deliver button (hidden for coupon)
             html += `<button class="btn ${allDelivered ? "btn-success" : "btn-primary"} btn-sm scheme-deliver-family"
                 data-famcode="${this._esc(fam.famcode)}">${allDelivered ? "✓ " + I18n.t("delivered") : I18n.t("deliver")}</button>`;
         }
@@ -1743,7 +1743,7 @@ const Scheme = {
             html += `<button class="btn ${isDelivered ? "btn-success" : "btn-primary"} btn-sm scheme-other-individual-deliver"
                 data-voter-id="${m.voter_id}" data-famcode="${this._esc(famcode)}"
                 data-booth="${this._esc(m.booth || "")}">${isDelivered ? "✓ " + I18n.t("done_label") : I18n.t("deliver")}</button>`;
-        } else {
+        } else if (scheme.id !== "coupon") {
             html += `<button class="btn ${isDelivered ? "btn-success" : "btn-primary"} btn-sm scheme-deliver-family"
                 data-famcode="${this._esc(famcode)}">${isDelivered ? "✓" : I18n.t("deliver")}</button>`;
         }

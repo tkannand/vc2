@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic-settings
+python-multipart
+openpyxl
+azure-data-tables
+structlog
+python-dotenv

@@ -28,7 +28,8 @@
       "Bash(tasklist //FI \"PID eq 33948\" //FO CSV)",
       "Bash(curl -s http://localhost:8080/js/mini-charts.js)",
       "Bash(curl -s http://localhost:8080/js/schemes.js)",
-      "Bash(curl -s http://localhost:8080/)"
+      "Bash(curl -s http://localhost:8080/)",
+      "Bash(curl -s http://localhost:8080/js/universe.js)"
     ]
   }
 }

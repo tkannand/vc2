@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Delivery Tool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Background -->
+    <div class="bg-gradient"></div>
+    <div class="bg-grid"></div>
+
+    <!-- Main Container -->
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="logo-mark">BD</div>
+                <div>
+                    <h1 class="header-title">Bulk Delivery</h1>
+                    <p class="header-subtitle">Manual Upload Tool</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="stepper" id="stepper">
+                    <div class="step active" data-step="1"><span class="step-num">1</span><span class="step-label">Upload</span></div>
+                    <div class="step-line"></div>
+                    <div class="step" data-step="2"><span class="step-num">2</span><span class="step-label">Scheme</span></div>
+                    <div class="step-line"></div>
+                    <div class="step" data-step="3"><span class="step-num">3</span><span class="step-label">Diagnostics</span></div>
+                    <div class="step-line"></div>
+                    <div class="step" data-step="4"><span class="step-num">4</span><span class="step-label">Process</span></div>
+                    <div class="step-line"></div>
+                    <div class="step" data-step="5"><span class="step-num">5</span><span class="step-label">Done</span></div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <main class="content" id="content">
+
+            <!-- Step 1: Upload -->
+            <section class="panel" id="step-upload">
+                <div class="panel-header">
+                    <h2>Upload Excel File</h2>
+                    <p>Upload an Excel file containing a list of EPIC numbers to mark as delivered</p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="operatorName">Your Name (Operator)</label>
+                    <input type="text" id="operatorName" class="form-input" placeholder="Enter your full name" autocomplete="off">
+                </div>
+
+                <div class="drop-zone" id="dropZone">
+                    <div class="drop-zone-inner">
+                        <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="12" y1="18" x2="12" y2="12"></line>
+                            <polyline points="9 15 12 12 15 15"></polyline>
+                        </svg>
+                        <p class="drop-text">Drag & drop your Excel file here</p>
+                        <p class="drop-subtext">or click to browse (.xlsx files only)</p>
+                    </div>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+                </div>
+
+                <div class="file-info hidden" id="fileInfo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    <span id="fileName"></span>
+                    <button class="btn-icon" id="removeFile" title="Remove file">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <button class="btn btn-primary btn-lg" id="btnUpload" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                        <polyline points="16 16 12 12 8 16"></polyline>
+                        <line x1="12" y1="12" x2="12" y2="21"></line>
+                        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
+                    </svg>
+                    Upload & Parse
+                </button>
+            </section>
+
+            <!-- Step 2: Select Scheme -->
+            <section class="panel hidden" id="step-scheme">
+                <div class="panel-header">
+                    <h2>Select Scheme</h2>
+                    <p>Choose which scheme to mark deliveries for</p>
+                </div>
+                <div class="upload-summary" id="uploadSummary"></div>
+                <div class="scheme-grid" id="schemeGrid"></div>
+            </section>
+
+            <!-- Step 3: Diagnostics -->
+            <section class="panel hidden" id="step-diagnostics">
+                <div class="panel-header">
+                    <h2>Diagnostics</h2>
+                    <p>Checking each EPIC against the database</p>
+                </div>
+
+                <!-- Loading state -->
+                <div id="diagLoading" class="loading-state">
+                    <div class="loader-ring">
+                        <div></div><div></div><div></div><div></div>
+                    </div>
+                    <p class="loading-text">Running diagnostics...</p>
+                    <p class="loading-subtext">Checking EPICs against voter database and delivery records</p>
+                </div>
+
+                <!-- Results state -->
+                <div id="diagResults" class="hidden">
+                    <div class="stats-row" id="diagStats"></div>
+
+                    <div id="diagTableContainer" class="hidden">
+                        <div class="table-header-row">
+                            <h3 id="diagTableTitle"></h3>
+                            <div class="tab-bar" id="diagTabs"></div>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="data-table" id="diagTable">
+                                <thead id="diagTableHead"></thead>
+                                <tbody id="diagTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="action-bar">
+                        <button class="btn btn-ghost" id="btnBackScheme">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                            Back
+                        </button>
+                        <button class="btn btn-primary btn-lg" id="btnConfirmProcess" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            Confirm & Process
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 4: Processing -->
+            <section class="panel hidden" id="step-process">
+                <div class="panel-header">
+                    <h2>Processing Deliveries</h2>
+                    <p id="processSubtext">Marking voters as delivered...</p>
+                </div>
+
+                <div class="progress-container">
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill" id="progressBar"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span id="progressCount">0 / 0</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                </div>
+
+                <div class="process-stats" id="processStats">
+                    <div class="process-stat stat-success">
+                        <span class="process-stat-num" id="statSuccess">0</span>
+                        <span class="process-stat-label">Delivered</span>
+                    </div>
+                    <div class="process-stat stat-fail">
+                        <span class="process-stat-num" id="statFailed">0</span>
+                        <span class="process-stat-label">Failed</span>
+                    </div>
+                    <div class="process-stat stat-attempt">
+                        <span class="process-stat-num" id="statAttempt">1</span>
+                        <span class="process-stat-label">Attempt</span>
+                    </div>
+                </div>
+
+                <div class="retry-banner hidden" id="retryBanner">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                    <span id="retryText">Retrying failed items in 60s...</span>
+                </div>
+            </section>
+
+            <!-- Step 5: Complete -->
+            <section class="panel hidden" id="step-complete">
+                <div class="panel-header">
+                    <div class="complete-icon" id="completeIcon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="48" height="48">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </div>
+                    <h2 id="completeTitle">Processing Complete</h2>
+                    <p id="completeSubtext"></p>
+                </div>
+
+                <div class="final-stats" id="finalStats"></div>
+
+                <div class="action-bar">
+                    <button class="btn btn-primary btn-lg" id="btnStartOver">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                            <polyline points="1 4 1 10 7 10"></polyline>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                        </svg>
+                        Start New Upload
+                    </button>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
