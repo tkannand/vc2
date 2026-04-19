@@ -1478,6 +1478,37 @@ body {
     color: var(--text-muted);
 }
 
+.member-party-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin: 6px 0 2px;
+}
+
+.party-tag {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--bg-main);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+}
+
+.alliance-tag {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 999px;
+    color: #fff;
+}
+
+.alliance-dmk-plus { background: #e53935; }
+.alliance-admk-plus { background: #388e3c; }
+.alliance-tmk { background: #6a1b9a; }
+.alliance-ntk { background: #f57f17; color: #000; }
+.alliance-others { background: #78909c; }
+
 .member-status-row {
     display: flex;
     gap: 6px;
@@ -1503,7 +1534,34 @@ body {
 .btn-status:active { transform: scale(0.96); }
 .btn-status.selected-called { border-color: var(--success); background: var(--success-light); color: var(--success); }
 .btn-status.selected-didnt_answer { border-color: var(--danger); background: var(--danger-light); color: var(--danger); }
-.btn-status.selected-skipped { border-color: var(--warning); background: var(--warning-light); color: var(--warning); }
+.member-sentiment-row {
+    display: none;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.member-sentiment-row.visible {
+    display: flex;
+}
+
+.btn-sentiment {
+    flex: 1;
+    padding: 8px 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font);
+    text-align: center;
+}
+
+.btn-sentiment:active { transform: scale(0.96); }
+.btn-sentiment.selected-positive { border-color: var(--success); background: var(--success-light); color: var(--success); }
+.btn-sentiment.selected-negative { border-color: var(--danger); background: var(--danger-light); color: var(--danger); }
 
 .member-notes-row {
     margin-top: 8px;

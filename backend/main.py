@@ -137,6 +137,10 @@ async def heartbeat_endpoint(request: Request, body: HeartbeatEntry):
     return {"ok": True}
 
 
+# Mount bulk delivery sub-app at /bulk (before static mounts)
+from bulk_deliver.backend.main import app as bulk_app
+app.mount("/bulk", bulk_app)
+
 app.mount("/css", StaticFiles(directory=os.path.join(FRONTEND_DIR, "css")), name="css")
 app.mount("/js", StaticFiles(directory=os.path.join(FRONTEND_DIR, "js")), name="js")
 app.mount("/icons", StaticFiles(directory=os.path.join(FRONTEND_DIR, "icons")), name="icons")

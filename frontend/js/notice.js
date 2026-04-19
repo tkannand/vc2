@@ -1061,12 +1061,28 @@ const Notice = {
             });
         }
 
+        const bulkDeliveryHtml = `
+            <h3 class="section-title" style="margin-top:20px;">Admin Tools</h3>
+            <div class="settings-card">
+                <div class="settings-card-header">
+                    <div>
+                        <div class="settings-card-title">Bulk Delivery Upload</div>
+                        <div class="settings-card-desc">Upload an Excel file with EPIC numbers to mark voters as delivered in bulk. Includes diagnostics, retry logic, and full audit trail.</div>
+                    </div>
+                    <button onclick="window.open('/bulk/', '_blank')" style="padding:10px 20px;background:#4f8cff;color:#fff;border:none;border-radius:8px;font-family:inherit;font-weight:600;font-size:0.85rem;cursor:pointer;white-space:nowrap;">Open Tool</button>
+                </div>
+                <div class="settings-card-footer">
+                    <span class="settings-meta">Opens in a new tab</span>
+                </div>
+            </div>`;
+
         document.getElementById("settings-container").innerHTML =
             mkCard("toggle-app-access",  I18n.t("app_access"),         I18n.t("app_access_desc"),    appOn,    this._formatSettingMeta(res.app_access_enabled_updated_by,   res.app_access_enabled_updated_at)) +
             mkCard("toggle-telecalling", I18n.t("telecalling"),        I18n.t("telecalling_desc"),   tcOn,     this._formatSettingMeta(res.telecalling_enabled_updated_by,   res.telecalling_enabled_updated_at)) +
             mkCard("toggle-notice",      I18n.t("notice_distribution"), I18n.t("notice_toggle_desc"), noticeOn, this._formatSettingMeta(res.notice_enabled_updated_by,        res.notice_enabled_updated_at)) +
             mkCard("toggle-coupon",      "Coupon Distribution",         "Enable/disable coupon distribution for booth and ward workers", couponOn, this._formatSettingMeta(res.coupon_enabled_updated_by, res.coupon_enabled_updated_at)) +
-            customSchemesHtml;
+            customSchemesHtml +
+            bulkDeliveryHtml;
 
         const wire = (id, apiCall, onMsg, offMsg, cb) => {
             document.getElementById(id)?.addEventListener("change", async (e) => {

@@ -107,6 +107,7 @@ class BulkRemoveRequest(BaseModel):
 class UpdateCallStatus(BaseModel):
     status: str
     notes: Optional[str] = Field(None, max_length=1000)
+    sentiment: Optional[str] = Field("", max_length=20)
 
     @field_validator("status")
     @classmethod
@@ -115,6 +116,13 @@ class UpdateCallStatus(BaseModel):
         if v not in valid:
             raise ValueError(f"Status must be one of: {', '.join(valid)}")
         return v
+
+    @field_validator("sentiment")
+    @classmethod
+    def validate_sentiment(cls, v):
+        if v and v not in ("positive", "negative", ""):
+            raise ValueError("Sentiment must be 'positive', 'negative', or empty")
+        return v or ""
 
     @field_validator("notes")
     @classmethod

@@ -263,7 +263,10 @@ const Booth = {
                 <div class="member-status-row" data-voter="${m.voter_id}">
                     <button class="btn-status" data-status="called" data-voter="${m.voter_id}">${I18n.t("called")}</button>
                     <button class="btn-status" data-status="didnt_answer" data-voter="${m.voter_id}">${I18n.t("didnt_answer")}</button>
-                    <button class="btn-status" data-status="skipped" data-voter="${m.voter_id}">${I18n.t("skipped")}</button>
+                </div>
+                <div class="member-sentiment-row" data-voter="${m.voter_id}">
+                    <button class="btn-sentiment" data-sentiment="positive" data-voter="${m.voter_id}">${I18n.t("positive")}</button>
+                    <button class="btn-sentiment" data-sentiment="negative" data-voter="${m.voter_id}">${I18n.t("negative")}</button>
                 </div>
                 <div class="member-notes-row" data-voter="${m.voter_id}">
                     <textarea class="notes-input" data-voter="${m.voter_id}" placeholder="${I18n.t("notes_optional")}">${m.notes || ""}</textarea>
@@ -278,6 +281,15 @@ const Booth = {
 
         const dispName = I18n.currentLang === "ta" && m.name_ta ? m.name_ta : m.name;
         const relName = I18n.currentLang === "ta" && m.relation_name_ta ? m.relation_name_ta : (m.relation_name || "-");
+
+        let partyHtml = "";
+        if (mode === "telecaller" && m.party_support) {
+            const allianceClass = (m.alliance || "").replace("+", "-plus").toLowerCase();
+            partyHtml = `<div class="member-party-row">
+                <span class="party-tag">${this.escHtml(m.party_support)}</span>
+                ${m.alliance ? `<span class="alliance-tag alliance-${allianceClass}">${this.escHtml(m.alliance)}</span>` : ""}
+            </div>`;
+        }
 
         return `
             <div class="member-row" data-voter="${m.voter_id}"
@@ -297,6 +309,7 @@ const Booth = {
                     <span class="member-detail"><span class="label">${I18n.t("relationship")}:</span> ${this.escHtml(m.relationship || "-")}</span>
                     <span class="member-detail member-rel-name"><span class="label">${I18n.t("relation_name")}:</span> ${this.escHtml(relName)}</span>
                 </div>
+                ${partyHtml}
                 ${phoneSection}
                 ${actionsHtml}
             </div>
@@ -370,8 +383,31 @@ const Booth = {
                 btn.classList.add(`selected-${status}`);
                 btn.dataset.selectedStatus = status;
 
+                const sentimentRow = container.querySelector(`.member-sentiment-row[data-voter="${voterId}"]`);
+                if (sentimentRow) {
+                    if (status === "called") {
+                        sentimentRow.classList.add("visible");
+                    } else {
+                        sentimentRow.classList.remove("visible");
+                        sentimentRow.querySelectorAll(".btn-sentiment").forEach((b) => {
+                            b.className = "btn-sentiment";
+                        });
+                    }
+                }
+
                 const notesRow = container.querySelector(`.member-notes-row[data-voter="${voterId}"]`);
                 if (notesRow) notesRow.classList.add("visible");
+            });
+        });
+
+        // Sentiment buttons
+        container.querySelectorAll(".btn-sentiment").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const row = btn.closest(".member-sentiment-row");
+                row.querySelectorAll(".btn-sentiment").forEach((b) => {
+                    b.className = "btn-sentiment";
+                });
+                btn.classList.add(`selected-${btn.dataset.sentiment}`);
             });
         });
 
@@ -388,16 +424,22 @@ const Booth = {
                 const status = selected.dataset.status;
                 const notes = container.querySelector(`.notes-input[data-voter="${voterId}"]`)?.value || "";
 
+                let sentiment = "";
+                if (status === "called") {
+                    const sentimentBtn = container.querySelector(`.member-sentiment-row[data-voter="${voterId}"] .btn-sentiment[class*='selected-']`);
+                    sentiment = sentimentBtn ? sentimentBtn.dataset.sentiment : "";
+                }
+
                 App.setBtnLoading(btn, true);
                 const user = App.getUser();
                 let result;
                 if (mode === "telecaller") {
                     const booth = Telecaller.families[Telecaller.familyIndex]?.booth;
-                    result = await API.telecallerUpdateStatus(user.ward, booth, voterId, status, notes);
+                    result = await API.telecallerUpdateStatus(user.ward, booth, voterId, status, notes, sentiment);
                 } else if (mode === "ward") {
-                    result = await API.wardUpdateStatus(user.ward, Ward.drillBooth, voterId, status, notes);
+                    result = await API.wardUpdateStatus(user.ward, Ward.drillBooth, voterId, status, notes, sentiment);
                 } else {
-                    result = await API.updateStatus(user.ward, user.booth, voterId, status, notes);
+                    result = await API.updateStatus(user.ward, user.booth, voterId, status, notes, sentiment);
                 }
                 App.setBtnLoading(btn, false);
 

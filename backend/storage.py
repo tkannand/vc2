@@ -902,7 +902,7 @@ def get_users_for_ward(ward: str) -> list:
 
 # ---- Call Status Operations ----
 
-def upsert_call_status(ward: str, booth: str, voter_id: str, status: str, notes: str = "", called_by: str = ""):
+def upsert_call_status(ward: str, booth: str, voter_id: str, status: str, notes: str = "", called_by: str = "", sentiment: str = ""):
     table = get_table(table_name("CallStatus"))
     pk = f"{normalize_key(ward)}__{normalize_key(booth)}"
     from datetime import datetime, timezone
@@ -920,6 +920,7 @@ def upsert_call_status(ward: str, booth: str, voter_id: str, status: str, notes:
         "status": status,
         "notes": notes,
         "called_by": called_by,
+        "sentiment": sentiment,
         "updated_at": now,
         "created_at": existing["created_at"] if existing else now,
     }

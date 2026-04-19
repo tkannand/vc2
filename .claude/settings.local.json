@@ -29,7 +29,10 @@
       "Bash(curl -s http://localhost:8080/js/mini-charts.js)",
       "Bash(curl -s http://localhost:8080/js/schemes.js)",
       "Bash(curl -s http://localhost:8080/)",
-      "Bash(curl -s http://localhost:8080/js/universe.js)"
+      "Bash(curl -s http://localhost:8080/js/universe.js)",
+      "Bash(curl -s http://localhost:8001/)",
+      "Bash(taskkill //F //FI \"WINDOWTITLE eq *uvicorn*\")",
+      "Bash(pkill -f \"uvicorn bulk_deliver\")"
     ]
   }
 }

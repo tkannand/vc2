@@ -217,6 +217,7 @@ async def ward_update_status(request: Request, voter_id: str, body: UpdateCallSt
     storage.upsert_call_status(
         ward=ward, booth=booth, voter_id=voter_id,
         status=body.status, notes=body.notes or "", called_by=user["phone"],
+        sentiment=body.sentiment or "",
     )
     log_call_status_change(user["phone"], voter_id, body.status, ip)
     return {"success": True, "status": body.status}

@@ -1,6 +1,6 @@
 /* ── Bulk Delivery Wizard ────────────────────────────────────────────────── */
 
-const API = "";
+const API = "/bulk";
 
 const state = {
     batchId: null,

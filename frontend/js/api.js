@@ -97,8 +97,8 @@ const API = {
     revealPhone(ward, booth, voterId) {
         return this.post(`/api/booth/voter/${enc(voterId)}/reveal-phone?ward=${enc(ward)}&booth=${enc(booth)}`);
     },
-    updateStatus(ward, booth, voterId, status, notes) {
-        return this.post(`/api/booth/voter/${enc(voterId)}/status?ward=${enc(ward)}&booth=${enc(booth)}`, { status, notes });
+    updateStatus(ward, booth, voterId, status, notes, sentiment) {
+        return this.post(`/api/booth/voter/${enc(voterId)}/status?ward=${enc(ward)}&booth=${enc(booth)}`, { status, notes, sentiment: sentiment || "" });
     },
     updatePerson(ward, booth, voterId, phones, partySupport) {
         return this.post(`/api/booth/voter/${enc(voterId)}/update-person?ward=${enc(ward)}&booth=${enc(booth)}`, { phones, party_support: partySupport });
@@ -121,8 +121,8 @@ const API = {
     wardUpdatePerson(ward, booth, voterId, phones, partySupport) {
         return this.post(`/api/ward/booth-voter/${enc(voterId)}/update-person?ward=${enc(ward)}&booth=${enc(booth)}`, { phones, party_support: partySupport });
     },
-    wardUpdateStatus(ward, booth, voterId, status, notes) {
-        return this.post(`/api/ward/booth-voter/${enc(voterId)}/status?ward=${enc(ward)}&booth=${enc(booth)}`, { status, notes });
+    wardUpdateStatus(ward, booth, voterId, status, notes, sentiment) {
+        return this.post(`/api/ward/booth-voter/${enc(voterId)}/status?ward=${enc(ward)}&booth=${enc(booth)}`, { status, notes, sentiment: sentiment || "" });
     },
     getWardPendingStatus(ward, booth) { return this.get(`/api/ward/pending-status?ward=${enc(ward)}&booth=${enc(booth)}`); },
 
@@ -134,19 +134,20 @@ const API = {
         if (booth) url += `&booth=${enc(booth)}`;
         return this.get(url);
     },
-    getTelecallerFamilies(ward, booth, street, tab, schemeIds) {
+    getTelecallerFamilies(ward, booth, street, tab, schemeIds, partyFilter) {
         let url = `/api/telecaller/families?ward=${enc(ward)}&tab=${enc(tab || "not_called")}`;
         if (booth) url += `&booth=${enc(booth)}`;
         if (street) url += `&street=${enc(street)}`;
         const ids = Array.isArray(schemeIds) ? schemeIds.join(",") : (schemeIds || "");
         if (ids) url += `&scheme_ids=${enc(ids)}`;
+        if (partyFilter) url += `&party_filter=${enc(partyFilter)}`;
         return this.get(url);
     },
     telecallerRevealPhone(ward, booth, voterId) {
         return this.post(`/api/ward/booth-voter/${enc(voterId)}/reveal-phone?ward=${enc(ward)}&booth=${enc(booth)}`);
     },
-    telecallerUpdateStatus(ward, booth, voterId, status, notes) {
-        return this.post(`/api/ward/booth-voter/${enc(voterId)}/status?ward=${enc(ward)}&booth=${enc(booth)}`, { status, notes });
+    telecallerUpdateStatus(ward, booth, voterId, status, notes, sentiment) {
+        return this.post(`/api/ward/booth-voter/${enc(voterId)}/status?ward=${enc(ward)}&booth=${enc(booth)}`, { status, notes, sentiment: sentiment || "" });
     },
 
     // Admin

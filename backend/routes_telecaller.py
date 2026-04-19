@@ -9,6 +9,47 @@ from backend.routes_booth import sanitize_voter
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/telecaller", tags=["telecaller"])
 
+# Phone fields to check for having a number
+_PHONE_FIELDS = ("phone_sr_enc", "phone_enc", "whatsapp_enc", "phone3_enc")
+
+def _voter_has_phone(v: dict) -> bool:
+    return any(v.get(f, "") for f in _PHONE_FIELDS)
+
+# Alliance mappings
+DMK_ALLIANCE = {"DMK", "Congress", "DMDK", "MDMK", "CPI", "CPM", "MNM", "VCK", "PMK"}
+ADMK_ALLIANCE = {"AIADMK", "ADMK", "BJP", "TMC(M)", "AMMK"}
+TMK_PARTIES = {"TMK"}
+NTK_PARTIES = {"NTK"}
+
+def _get_alliance(party: str) -> str:
+    if not party:
+        return ""
+    if party in DMK_ALLIANCE:
+        return "DMK+"
+    if party in ADMK_ALLIANCE:
+        return "ADMK+"
+    if party in TMK_PARTIES:
+        return "TMK"
+    if party in NTK_PARTIES:
+        return "NTK"
+    return "Others"
+
+def _matches_party_filter(party: str, party_filter: str) -> bool:
+    if not party_filter:
+        return True
+    alliance = _get_alliance(party)
+    if party_filter == "dmk_alliance":
+        return alliance == "DMK+"
+    if party_filter == "admk_alliance":
+        return alliance == "ADMK+"
+    if party_filter == "tmk":
+        return alliance == "TMK"
+    if party_filter == "ntk":
+        return alliance == "NTK"
+    if party_filter == "others":
+        return alliance == "Others"
+    return True
+
 
 def _check_ward_access(user: dict, ward: str):
     if user.get("role") == "telecaller" and user.get("ward") != ward:
@@ -72,7 +113,7 @@ def _get_scheme_statuses(ward: str, booth: str, scheme_id: str) -> dict:
 @router.get("/families")
 async def get_telecaller_families(
     request: Request, ward: str, booth: str = "", street: str = "", tab: str = "not_called",
-    scheme_ids: str = ""
+    scheme_ids: str = "", party_filter: str = ""
 ):
     user = require_role(request, "telecaller", "superadmin")
     _check_ward_access(user, ward)
@@ -105,8 +146,14 @@ async def get_telecaller_families(
         statuses = statuses_per_booth[i]
         all_scheme_statuses = scheme_map.get(b, {})
 
-        # Telecaller only calls seg-synced voters (140K with phones/party data)
-        voters = [v for v in voters if v.get("seg_synced") == "true"]
+        # Telecaller only calls seg-synced voters with party data and phone numbers
+        voters = [
+            v for v in voters
+            if v.get("seg_synced") == "true"
+            and v.get("party_support", "")
+            and _voter_has_phone(v)
+            and _matches_party_filter(v.get("party_support", ""), party_filter)
+        ]
 
         if street:
             voters = [v for v in voters if storage.street_key(v) == street]
@@ -143,6 +190,7 @@ async def get_telecaller_families(
             member = sanitize_voter(v)
             member["status"] = voter_status
             member["notes"] = status_record.get("notes", "")
+            member["alliance"] = _get_alliance(v.get("party_support", ""))
             # Per-scheme delivery status for this voter
             member["scheme_statuses"] = {
                 sid: all_scheme_statuses[sid].get(vid, {}).get("status", "not_delivered")

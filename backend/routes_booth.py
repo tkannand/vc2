@@ -231,6 +231,7 @@ async def update_status(request: Request, voter_id: str, body: UpdateCallStatus,
         status=body.status,
         notes=body.notes or "",
         called_by=user["phone"],
+        sentiment=body.sentiment or "",
     )
     log_call_status_change(user["phone"], voter_id, body.status, ip)
 

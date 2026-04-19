@@ -2,6 +2,7 @@ const Telecaller = {
     currentBooth: "",
     currentStreet: "",
     currentTab: "not_called",
+    partyFilter: "",
     families: [],
     familiesAll: [],
     familyIndex: 0,
@@ -17,6 +18,7 @@ const Telecaller = {
         this.currentBooth = "";
         this.currentStreet = "";
         this.currentTab = "not_called";
+        this.partyFilter = "";
         this.allSchemes = [];
         this.selectedSchemeIds = [];
         this.deliveredOnlyFilter = true;
@@ -25,6 +27,7 @@ const Telecaller = {
         this.bindStreetFilter();
         this.bindTabs();
         this.bindFamilyNav();
+        this.bindPartyFilter();
 
         App.showViewLoading("view-telecaller");
         await this.loadBooths();
@@ -173,7 +176,7 @@ const Telecaller = {
         const user = App.getUser();
         const data = await API.getTelecallerFamilies(
             user.ward, this.currentBooth, this.currentStreet,
-            this.currentTab, this.selectedSchemeIds
+            this.currentTab, this.selectedSchemeIds, this.partyFilter
         );
         App.hideViewLoading("view-telecaller");
         if (data.error) return;
@@ -315,6 +318,22 @@ const Telecaller = {
                 this.familyIndex++;
                 this.renderFamily();
             }
+        });
+    },
+
+    bindPartyFilter() {
+        document.querySelectorAll(".tc-party-pill").forEach((pill) => {
+            pill.addEventListener("click", async () => {
+                if (this.hasPendingInCurrentFamily()) {
+                    App.showToast(I18n.t("pending_status_required"));
+                    return;
+                }
+                document.querySelectorAll(".tc-party-pill").forEach((p) => p.classList.remove("active"));
+                pill.classList.add("active");
+                this.partyFilter = pill.dataset.party;
+                this.familyIndex = 0;
+                await this.loadFamilies();
+            });
         });
     },
 };

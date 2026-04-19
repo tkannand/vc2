@@ -1002,6 +1002,14 @@ TRANSLATIONS = {
     "enter_party": {
         "en": "Enter party name",
         "ta": "கட்சி பெயரை உள்ளிடு"
+    },
+    "positive": {
+        "en": "Positive",
+        "ta": "நேர்மறை"
+    },
+    "negative": {
+        "en": "Negative",
+        "ta": "எதிர்மறை"
     }
 }
 
