@@ -787,6 +787,64 @@ async def get_summary(
     }
 
 
+@router.get("/notice-by-party")
+async def get_notice_by_party(request: Request, ward: Optional[str] = None, booth: Optional[str] = None):
+    """Notice delivery stats grouped by party alliance (DMK+, ADMK+, NTK, TVK, Others)."""
+    from backend.routes_telecaller import _get_alliance
+
+    user = require_role(request, "superadmin", "ward", "booth")
+    role = user.get("role", "superadmin")
+    if role == "ward":
+        ward = user.get("ward", "")
+    elif role == "booth":
+        ward = user.get("ward", "")
+        booth = user.get("booth", "")
+
+    all_wards = storage.get_all_wards()
+    if ward and booth:
+        wb_pairs = [(ward, booth)]
+    elif ward:
+        wb_pairs = [(ward, b) for b in storage.get_booths_for_ward(ward)]
+    else:
+        wb_pairs = [(w, b) for w in all_wards for b in storage.get_booths_for_ward(w)]
+
+    async def fetch_booth(w, b):
+        voters = await asyncio.to_thread(storage.get_notice_voters_by_booth, w, b)
+        statuses = await asyncio.to_thread(storage.get_all_notice_statuses, w, b)
+        return voters, statuses
+
+    results = await asyncio.gather(*[fetch_booth(w, b) for w, b in wb_pairs])
+
+    alliance_map = {}
+    for voters, statuses in results:
+        for v in voters:
+            vid = v.get("RowKey", "")
+            party = v.get("party_support", "")
+            alliance = _get_alliance(party) if party else "Unknown"
+            if alliance not in alliance_map:
+                alliance_map[alliance] = {"alliance": alliance, "total": 0, "delivered": 0}
+            alliance_map[alliance]["total"] += 1
+            if statuses.get(vid, {}).get("status") == "delivered":
+                alliance_map[alliance]["delivered"] += 1
+
+    # Fixed display order
+    order = ["DMK+", "ADMK+", "NTK", "TVK", "Others", "Unknown"]
+    rows = []
+    for name in order:
+        if name in alliance_map:
+            rows.append(alliance_map[name])
+    # Any remaining alliances not in the fixed order
+    for name, data in alliance_map.items():
+        if name not in order:
+            rows.append(data)
+
+    for r in rows:
+        r["pending"] = r["total"] - r["delivered"]
+        r["pct"] = round(r["delivered"] / r["total"] * 100 if r["total"] else 0, 1)
+
+    return {"parties": rows}
+
+
 @router.get("/drill")
 async def get_drill(request: Request, ward: str, booth: str = ""):
     """Drill-down: ward→booths or ward+booth→streets, with calling+notice+coupon stats."""

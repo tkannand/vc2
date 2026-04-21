@@ -182,6 +182,7 @@ const Admin = {
             }
             this.renderUniverse(scopeU);
             this.renderSchemes(data.schemes || {});
+            this.loadNoticeByParty(scopeWard, scopeBooth);
             this._updateGeoSchemeTabs(drillRes?.custom_schemes || data.schemes?.custom || []);
             this._renderGeoChart(drillRes?.items || []);
             this._updateGeoTitle();
@@ -227,6 +228,7 @@ const Admin = {
             this._drillItems  = data.wards || [];
 
             this.renderSchemes(data.schemes || {});
+            this.loadNoticeByParty("", "");
             this._updateGeoSchemeTabs(data.schemes?.custom || []);
             this._renderGeoChart(data.wards || []);
             this._updateBreadcrumb();
@@ -916,6 +918,75 @@ const Admin = {
             makeCard("🎫", "Coupon Dist.", p.done, p.total, p.pct, p.pending,    "#f59e0b", p.enabled,
                      p.families || 0, p.families_done || 0) +
             customCards;
+    },
+
+    // ── Notice by Party table ────────────────────────────────────────────────
+    async loadNoticeByParty(ward, booth) {
+        const section = document.getElementById("admin-notice-party-section");
+        const container = document.getElementById("admin-notice-party-table");
+        if (!section || !container) return;
+
+        const res = await API.getNoticeByParty(ward, booth);
+        if (res.error || !res.parties || res.parties.length === 0) {
+            section.style.display = "none";
+            return;
+        }
+
+        section.style.display = "";
+        const fmt = (v) => Number(v || 0).toLocaleString("en-IN");
+        const rows = res.parties;
+        const grandTotal = rows.reduce((s, r) => s + r.total, 0);
+        const grandDelivered = rows.reduce((s, r) => s + r.delivered, 0);
+        const grandPending = grandTotal - grandDelivered;
+        const grandPct = grandTotal > 0 ? Math.round(grandDelivered / grandTotal * 100) : 0;
+
+        const colors = {
+            "DMK+": "#e53935", "ADMK+": "#1e88e5", "NTK": "#43a047",
+            "TVK": "#8e24aa", "Others": "#78909c", "Unknown": "#bdbdbd"
+        };
+
+        container.innerHTML = `
+            <table class="notice-party-table">
+                <thead>
+                    <tr>
+                        <th>Party</th>
+                        <th>Total</th>
+                        <th>Delivered</th>
+                        <th>Pending</th>
+                        <th>%</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.map(r => `
+                        <tr>
+                            <td><span class="party-dot" style="background:${colors[r.alliance] || "#78909c"}"></span>${Booth.escHtml(r.alliance)}</td>
+                            <td>${fmt(r.total)}</td>
+                            <td class="td-delivered">${fmt(r.delivered)}</td>
+                            <td class="td-pending">${fmt(r.pending)}</td>
+                            <td>
+                                <div class="party-pct-bar">
+                                    <div class="party-pct-fill" style="width:${r.pct}%;background:${colors[r.alliance] || "#78909c"}"></div>
+                                    <span class="party-pct-text">${r.pct}%</span>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+                <tfoot>
+                    <tr class="notice-party-total-row">
+                        <td>Total</td>
+                        <td>${fmt(grandTotal)}</td>
+                        <td class="td-delivered">${fmt(grandDelivered)}</td>
+                        <td class="td-pending">${fmt(grandPending)}</td>
+                        <td>
+                            <div class="party-pct-bar">
+                                <div class="party-pct-fill" style="width:${grandPct}%;background:var(--accent)"></div>
+                                <span class="party-pct-text">${grandPct}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>`;
     },
 
     // ── Geographic drill-down chart ───────────────────────────────────────────

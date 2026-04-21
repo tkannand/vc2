@@ -166,6 +166,12 @@ const API = {
         if (booth) url += `&booth=${enc(booth)}`;
         return this.request("GET", url, null, 30000);
     },
+    getNoticeByParty(ward, booth) {
+        const p = [];
+        if (ward)  p.push(`ward=${enc(ward)}`);
+        if (booth) p.push(`booth=${enc(booth)}`);
+        return this.get(`/api/admin/notice-by-party${p.length ? "?" + p.join("&") : ""}`);
+    },
     getAdminFamilyStats(ward, booth) {
         const p = [];
         if (ward)  p.push(`ward=${enc(ward)}`);

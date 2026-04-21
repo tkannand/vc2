@@ -16,10 +16,10 @@ def _voter_has_phone(v: dict) -> bool:
     return any(v.get(f, "") for f in _PHONE_FIELDS)
 
 # Alliance mappings
-DMK_ALLIANCE = {"DMK", "Congress", "DMDK", "MDMK", "CPI", "CPM", "MNM", "VCK", "PMK"}
-ADMK_ALLIANCE = {"AIADMK", "ADMK", "BJP", "TMC(M)", "AMMK"}
-TMK_PARTIES = {"TMK"}
+DMK_ALLIANCE = {"DMK", "Congress", "DMDK", "MDMK", "CPI", "CPM", "VCK", "IUML", "CPI(M)", "CPI(ML)", "INC"}
+ADMK_ALLIANCE = {"AIADMK", "ADMK", "BJP", "PMK"}
 NTK_PARTIES = {"NTK"}
+TVK_PARTIES = {"TVK"}
 
 def _get_alliance(party: str) -> str:
     if not party:
@@ -28,10 +28,10 @@ def _get_alliance(party: str) -> str:
         return "DMK+"
     if party in ADMK_ALLIANCE:
         return "ADMK+"
-    if party in TMK_PARTIES:
-        return "TMK"
     if party in NTK_PARTIES:
         return "NTK"
+    if party in TVK_PARTIES:
+        return "TVK"
     return "Others"
 
 def _matches_party_filter(party: str, party_filter: str) -> bool:
@@ -42,10 +42,10 @@ def _matches_party_filter(party: str, party_filter: str) -> bool:
         return alliance == "DMK+"
     if party_filter == "admk_alliance":
         return alliance == "ADMK+"
-    if party_filter == "tmk":
-        return alliance == "TMK"
     if party_filter == "ntk":
         return alliance == "NTK"
+    if party_filter == "tvk":
+        return alliance == "TVK"
     if party_filter == "others":
         return alliance == "Others"
     return True
