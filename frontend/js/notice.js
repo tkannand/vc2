@@ -86,18 +86,32 @@ const Notice = {
         App.hideViewLoading("view-booth-notice");
         if (res.error) { App.showToast(res.detail || "Failed to load"); return; }
 
-        const families = [...(res.families || [])];
-        (res.ungrouped || []).forEach((m) => families.push({
-            famcode: m.voter_id, members: [m],
-            house: m.house, section: m.section,
-            head_name: m.name, head_name_ta: m.name_ta || "",
-            booth: user.booth,
-        }));
-        this.boothNoticeFamiliesAll = families;
+        // Flatten all members into individual entries sorted by SL
+        const flat = [];
+        (res.families || []).forEach(fam => {
+            (fam.members || []).forEach(m => {
+                flat.push({
+                    famcode: m.voter_id, members: [m],
+                    house: fam.house, section: m.section || fam.section || "",
+                    head_name: m.name, head_name_ta: m.name_ta || "",
+                    booth: m.booth || user.booth,
+                });
+            });
+        });
+        (res.ungrouped || []).forEach(m => {
+            flat.push({
+                famcode: m.voter_id, members: [m],
+                house: m.house, section: m.section || "",
+                head_name: m.name, head_name_ta: m.name_ta || "",
+                booth: m.booth || user.booth,
+            });
+        });
+        flat.sort((a, b) => (parseInt(a.members[0].sl) || 999999) - (parseInt(b.members[0].sl) || 999999));
+        this.boothNoticeFamiliesAll = flat;
 
         // Populate street filter
         const streetSel = document.getElementById("booth-notice-street-filter");
-        const streets = [...new Set(families.flatMap(f => f.members.map(m => m.section)).filter(Boolean))].sort();
+        const streets = [...new Set(flat.flatMap(f => f.members.map(m => m.section)).filter(Boolean))].sort();
         streetSel.innerHTML = `<option value="">All Streets</option>`;
         streets.forEach(s => { const o = document.createElement("option"); o.value = s; o.textContent = s; streetSel.appendChild(o); });
 
@@ -183,7 +197,7 @@ const Notice = {
         const pg    = Math.min(this.boothNoticePage, pages - 1);
         this.boothNoticePage = pg;
 
-        counter.textContent = `Page ${pg + 1} ${I18n.t("of")} ${pages} (${total} ${I18n.t("families") || "families"})`;
+        counter.textContent = `Page ${pg + 1} ${I18n.t("of")} ${pages} (${total} ${I18n.t("voters_label") || "voters"})`;
         prev.disabled = pg === 0;
         next.disabled = pg >= pages - 1;
         nav.style.display = pages > 1 ? "flex" : "none";
@@ -195,17 +209,6 @@ const Notice = {
     },
 
     _bindBoothNoticeCardActions(area) {
-        // Expand/collapse member details on row tap
-        area.querySelectorAll(".ncc-member-summary").forEach((row) => {
-            row.addEventListener("click", (e) => {
-                if (e.target.closest(".ncc-toggle")) return;
-                const details = row.nextElementSibling;
-                if (details && details.classList.contains("ncc-details")) {
-                    details.classList.toggle("ncc-details-open");
-                }
-            });
-        });
-
         area.querySelectorAll(".notice-toggle input").forEach(cb => {
             cb.addEventListener("change", async () => {
                 const vid = cb.dataset.voterId;
@@ -218,22 +221,6 @@ const Notice = {
                 }
                 cb.disabled = true;
                 await this._boothToggleNotice([vid], action);
-            });
-        });
-        area.querySelectorAll(".notice-deliver-all").forEach(btn => {
-            btn.addEventListener("click", async () => {
-                const fam = this.boothNoticeFamiliesAll.find(f => f.famcode === btn.dataset.famcode);
-                if (!fam) return;
-                const allDelivered = fam.members.every(m => m.status === "delivered");
-                if (allDelivered) {
-                    const confirmed = await Notice.confirmUndeliver();
-                    if (!confirmed) return;
-                    btn.disabled = true;
-                    await this._boothToggleNotice(fam.members.map(m => m.voter_id), "undeliver");
-                } else {
-                    btn.disabled = true;
-                    await this._boothToggleNotice(fam.members.filter(m => m.status !== "delivered").map(m => m.voter_id), "deliver");
-                }
             });
         });
     },
@@ -383,7 +370,7 @@ const Notice = {
     wardNoticeFamilies: [],
     wardNoticeFamiliesAll: [],
     wardNoticePage: 0,
-    WARD_NOTICE_PAGE_SIZE: 15,
+    WARD_NOTICE_PAGE_SIZE: 50,
 
     async initWardNotice() {
         this.wardNoticeFamilies = [];
@@ -401,21 +388,32 @@ const Notice = {
         App.hideViewLoading("view-ward-notice");
         if (res.error) return;
 
-        const families = [...(res.families || [])];
-        (res.ungrouped || []).forEach((m) => families.push({
-            famcode: m.voter_id, members: [m],
-            house: m.house, section: m.section,
-            head_name: m.name, head_name_ta: m.name_ta || "",
-            booth: m.booth || "",
-        }));
-        this.wardNoticeFamiliesAll = families;
-        // Log first delivered member to check field presence
-        const sample = families.flatMap(f=>f.members).find(m=>m.status==="delivered");
-        if (sample) console.log("[notice load] sample delivered member:", JSON.stringify({voter_id:sample.voter_id, status:sample.status, delivered_by:sample.delivered_by, delivered_by_name:sample.delivered_by_name, delivered_at:sample.delivered_at}));
+        // Flatten all members into individual entries sorted by SL
+        const flat = [];
+        (res.families || []).forEach(fam => {
+            (fam.members || []).forEach(m => {
+                flat.push({
+                    famcode: m.voter_id, members: [m],
+                    house: fam.house, section: m.section || fam.section || "",
+                    head_name: m.name, head_name_ta: m.name_ta || "",
+                    booth: m.booth || fam.booth || "",
+                });
+            });
+        });
+        (res.ungrouped || []).forEach(m => {
+            flat.push({
+                famcode: m.voter_id, members: [m],
+                house: m.house, section: m.section || "",
+                head_name: m.name, head_name_ta: m.name_ta || "",
+                booth: m.booth || "",
+            });
+        });
+        flat.sort((a, b) => (parseInt(a.members[0].sl) || 999999) - (parseInt(b.members[0].sl) || 999999));
+        this.wardNoticeFamiliesAll = flat;
 
         // Populate booth filter
         const boothSel = document.getElementById("ward-notice-booth-filter");
-        const booths = [...new Set(families.map((f) => f.booth).filter(Boolean))].sort();
+        const booths = [...new Set(flat.map((f) => f.booth).filter(Boolean))].sort();
         boothSel.innerHTML = `<option value="">All Booths</option>`;
         booths.forEach((b) => { const o = document.createElement("option"); o.value = b; o.textContent = b; boothSel.appendChild(o); });
 
@@ -558,7 +556,7 @@ const Notice = {
 
         const slice = this.wardNoticeFamilies.slice(pg * ps, pg * ps + ps);
 
-        counter.textContent = `Page ${pg + 1} ${I18n.t("of")} ${pages} (${total} ${I18n.t("families") || "families"})`;
+        counter.textContent = `Page ${pg + 1} ${I18n.t("of")} ${pages} (${total} ${I18n.t("voters_label") || "voters"})`;
         prev.disabled = pg === 0;
         next.disabled = pg >= pages - 1;
         nav.style.display = pages > 1 ? "flex" : "none";
@@ -569,85 +567,23 @@ const Notice = {
     },
 
     buildWardNoticeCard(fam, query) {
+        const m = (fam.members || [])[0];
+        if (!m) return "";
         const isTamil = I18n.currentLang === "ta";
-        const members = fam.members || [];
-        const deliveredCount = members.filter(m => m.status === "delivered").length;
-        const allDelivered = deliveredCount === members.length;
-        const section = members[0]?.section || "";
+        const name = isTamil ? (m.name_ta || m.name_en || m.name || "") : (m.name_en || m.name || "");
+        const isDelivered = m.status === "delivered";
 
-        let html = `<div class="family-card ncc">`;
-
-        // Compact header
-        html += `<div class="ncc-header">`;
-        html += `<div class="ncc-header-left">`;
-        html += `<span class="ncc-house">🏠 ${this.escapeHtml(fam.house || "-")}</span>`;
-        html += `<span class="ncc-count">(${members.length})</span>`;
-        if (section) html += `<span class="ncc-section">${this._hl(section, query)}</span>`;
-        if (deliveredCount > 0) {
-            html += `<span class="ncc-progress ${allDelivered ? "ncc-progress-full" : ""}">${deliveredCount}/${members.length} ✓</span>`;
-        }
-        html += `</div>`;
-        html += `<button class="btn ${allDelivered ? "btn-success" : "btn-primary"} btn-sm notice-deliver-all" data-famcode="${fam.famcode}">`;
-        html += allDelivered ? I18n.t("undeliver_all") : I18n.t("mark_house_done");
-        html += `</button></div>`;
-
-        // Member rows
-        members.forEach((m) => {
-            const name = isTamil ? (m.name_ta || m.name_en || m.name || "") : (m.name_en || m.name || "");
-            const relName = isTamil ? (m.relation_name_ta || m.relation_name || "-") : (m.relation_name || "-");
-            const isDelivered = m.status === "delivered";
-            const isHOF = m.is_head === "Yes";
-            const deliverer = isDelivered ? (m.delivered_by_name || (m.delivered_by ? "···" + m.delivered_by.slice(-4) : "")) : "";
-            const timeStr = isDelivered && m.delivered_at ? (() => {
-                const d = new Date(m.delivered_at);
-                return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
-            })() : "";
-
-            html += `<div class="ncc-member" data-voter="${m.voter_id}">`;
-
-            // Always-visible compact row
-            html += `<div class="ncc-member-summary">`;
-            html += `<div class="ncc-member-left">`;
-            if (m.sl) html += `<span class="ncc-sl">${this._hl(m.sl, query)}</span>`;
-            html += `<span class="ncc-name ${isDelivered ? "ncc-name-done" : ""}">${this._hl(name, query)}`;
-            if (isHOF) html += ` <span class="member-head-badge">👑</span>`;
-            html += `</span>`;
-            if (isDelivered && deliverer) html += `<span class="ncc-by">✓ ${this.escapeHtml(deliverer)}${timeStr ? " · " + timeStr : ""}</span>`;
-            html += `</div>`;
-            html += `<label class="notice-toggle ncc-toggle" onclick="event.stopPropagation()">`;
-            html += `<input type="checkbox" data-voter-id="${m.voter_id}" ${isDelivered ? "checked" : ""}/>`;
-            html += `<span class="notice-toggle-label">${isDelivered ? "✓ " + I18n.t("delivered") : "● " + I18n.t("not_delivered")}</span>`;
-            if (m._pending) html += `<span class="ncc-pending" title="Pending sync">⟳</span>`;
-            html += `</label>`;
-            html += `</div>`;
-
-            // Expandable details
-            html += `<div class="ncc-details">`;
-            if (m.voter_id) html += `<span class="ncc-detail"><span class="label">EPIC:</span> ${this._hl(m.voter_id, query)}</span>`;
-            if (m.sl)       html += `<span class="ncc-detail"><span class="label">SL:</span> ${this._hl(m.sl, query)}</span>`;
-            html += `<span class="ncc-detail">${m.age} · ${m.gender === "Male" ? I18n.t("male") : I18n.t("female")}</span>`;
-            if (m.relation_type) html += `<span class="ncc-detail">${this.escapeHtml(m.relation_type)} – ${this.escapeHtml(relName)}</span>`;
-            html += `</div>`;
-
-            html += `</div>`;
-        });
-
-        html += `</div>`;
-        return html;
+        return `<div class="scheme-flat-row ${isDelivered ? "ncc-delivered" : ""}${m._pending ? " ncc-pending-sync" : ""}">
+            <span class="scheme-flat-sl">${m.sl ? this._hl(m.sl, query) : "-"}</span>
+            <span class="scheme-flat-name">${this._hl(name, query)}</span>
+            <label class="notice-toggle ncc-toggle" onclick="event.stopPropagation()">
+                <input type="checkbox" data-voter-id="${m.voter_id}" ${isDelivered ? "checked" : ""}/>
+                <span class="notice-toggle-label">${m._pending ? "&#x27F3;" : isDelivered ? "&#x2713; " + I18n.t("done_label") : "&#x25CF; " + I18n.t("pending")}</span>
+            </label>
+        </div>`;
     },
 
     bindWardNoticeCardActions(area) {
-        // Expand/collapse member details on row tap
-        area.querySelectorAll(".ncc-member-summary").forEach((row) => {
-            row.addEventListener("click", (e) => {
-                if (e.target.closest(".ncc-toggle")) return;
-                const details = row.nextElementSibling;
-                if (details && details.classList.contains("ncc-details")) {
-                    details.classList.toggle("ncc-details-open");
-                }
-            });
-        });
-
         // Individual toggles
         area.querySelectorAll(".notice-toggle input").forEach((cb) => {
             cb.addEventListener("change", async () => {
@@ -661,26 +597,6 @@ const Notice = {
                 }
                 cb.disabled = true;
                 await this.wardToggleNotice([vid], action);
-            });
-        });
-
-        // Deliver/Undeliver all
-        area.querySelectorAll(".notice-deliver-all").forEach((btn) => {
-            btn.addEventListener("click", async () => {
-                const famcode = btn.dataset.famcode;
-                const fam = this.wardNoticeFamiliesAll.find((f) => f.famcode === famcode);
-                if (!fam) return;
-                const allDelivered = fam.members.every((m) => m.status === "delivered");
-                if (allDelivered) {
-                    const confirmed = await Notice.confirmUndeliver();
-                    if (!confirmed) return;
-                    btn.disabled = true;
-                    await this.wardToggleNotice(fam.members.map((m) => m.voter_id), "undeliver");
-                } else {
-                    btn.disabled = true;
-                    const undelivered = fam.members.filter((m) => m.status !== "delivered").map((m) => m.voter_id);
-                    await this.wardToggleNotice(undelivered, "deliver");
-                }
             });
         });
     },

@@ -1509,6 +1509,59 @@ body {
 .alliance-ntk { background: #f57f17; color: #000; }
 .alliance-others { background: #78909c; }
 
+/* Flat notice rows */
+.scheme-flat-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+    background: var(--bg-card);
+    transition: background 0.2s;
+}
+
+.scheme-flat-row.ncc-delivered {
+    background: var(--success-light);
+}
+
+.scheme-flat-sl {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 36px;
+    text-align: right;
+}
+
+.scheme-flat-name {
+    flex: 1;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.scheme-flat-row.ncc-delivered .scheme-flat-name {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+
+.scheme-flat-row .notice-toggle {
+    width: auto;
+    height: auto;
+    position: static;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.scheme-flat-row .notice-toggle input { display: none; }
+
+.scheme-flat-row .notice-toggle input:checked + .notice-toggle-label {
+    background: var(--success-light);
+    color: var(--success);
+}
+
 .member-status-row {
     display: flex;
     gap: 6px;

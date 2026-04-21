@@ -125,16 +125,38 @@ const Scheme = {
 
     _parse(schemeId, res) {
         if (schemeId === "notice") {
-            const families = res.families || [];
-            const ungrouped = (res.ungrouped || []).map(m => ({
-                famcode: m.voter_id,
-                house: m.house,
-                section: m.section,
-                booth: m.booth,
-                members: [m],
-                _single: true,
-            }));
-            return { families, ungrouped };
+            // Flatten all members into individual entries sorted by SL
+            const allMembers = [];
+            (res.families || []).forEach(fam => {
+                (fam.members || []).forEach(m => {
+                    allMembers.push({
+                        famcode: m.voter_id,
+                        house: fam.house,
+                        section: m.section || fam.section || "",
+                        booth: m.booth || fam.booth || "",
+                        booth_name: fam.booth_name || "",
+                        booth_number: fam.booth_number || "",
+                        members: [m],
+                        _single: true,
+                    });
+                });
+            });
+            (res.ungrouped || []).forEach(m => {
+                allMembers.push({
+                    famcode: m.voter_id,
+                    house: m.house,
+                    section: m.section || "",
+                    booth: m.booth || "",
+                    members: [m],
+                    _single: true,
+                });
+            });
+            allMembers.sort((a, b) => {
+                const slA = parseInt(a.members[0].sl) || 999999;
+                const slB = parseInt(b.members[0].sl) || 999999;
+                return slA - slB;
+            });
+            return { families: allMembers, ungrouped: [] };
         }
         // coupon (and future family-type schemes)
         const all = res.families || [];
@@ -210,7 +232,7 @@ const Scheme = {
         const boothSI = document.getElementById("booth-scheme-search");
         if (boothSI) { boothSI.value = ""; boothSI.placeholder = "Enter SL number..."; }
         content.style.display = "block";
-        this._resetTabUI("#view-booth-scheme", "booth-scheme-family-panel", "booth-scheme-other-panel");
+        this._resetTabUI("#view-booth-scheme", "booth-scheme-family-panel", "booth-scheme-other-panel", schemeObj.id);
         this._bindBoothTabs();
         this._bindBoothFilters();
         this._bindBoothNav();
@@ -376,7 +398,7 @@ const Scheme = {
         const wardSI = document.getElementById("ward-scheme-search");
         if (wardSI) { wardSI.value = ""; wardSI.placeholder = "Enter SL number..."; }
         content.style.display = "block";
-        this._resetTabUI("#view-ward-scheme", "ward-scheme-family-panel", "ward-scheme-other-panel");
+        this._resetTabUI("#view-ward-scheme", "ward-scheme-family-panel", "ward-scheme-other-panel", schemeObj.id);
         this._bindWardTabs();
         this._bindWardFilters();
         this._bindWardNav();
@@ -545,7 +567,35 @@ const Scheme = {
 
     // ── Card builder ──────────────────────────────────────────────
 
+    _buildNoticeRow(fam, scheme, query) {
+        const m = fam.members[0];
+        if (!m) return "";
+        const sf = this._def(scheme.id).statusField;
+        const isDelivered = m[sf] === "delivered";
+        const isTa = I18n.currentLang === "ta";
+        const dispName = isTa
+            ? (m.name_ta || m.name_seg || m.name_en || m.name || "")
+            : (m.name_seg || m.name_en || m.name || m.name_ta || "");
+        const q = query || "";
+
+        return `<div class="scheme-flat-row ${isDelivered ? "ncc-delivered" : ""}${m._pending ? " ncc-pending-sync" : ""}" data-famcode="${this._esc(fam.famcode)}">
+            <span class="scheme-flat-sl">${m.sl ? this._hl(m.sl, q) : "-"}</span>
+            <span class="scheme-flat-name">${this._hl(dispName, q)}</span>
+            <label class="notice-toggle">
+                <input type="checkbox" class="scheme-member-toggle"
+                    data-voter-id="${m.voter_id}"
+                    data-famcode="${this._esc(fam.famcode)}"
+                    data-booth="${this._esc(m.booth || "")}"
+                    ${isDelivered ? "checked" : ""}>
+                <span class="notice-toggle-label">${m._pending ? "&#x27F3;" : isDelivered ? "&#x2713; " + I18n.t("done_label") : "&#x25CF; " + I18n.t("pending")}</span>
+            </label>
+        </div>`;
+    },
+
     _buildCard(fam, scheme, query, isSingle = false) {
+        if (scheme.id === "notice") {
+            return this._buildNoticeRow(fam, scheme, query);
+        }
         const def = this._def(scheme.id);
         const sf = def.statusField;
         const members = fam.members || [];
@@ -771,17 +821,6 @@ const Scheme = {
     },
 
     async _toggle(mode, voterIds, action, boothOverride = null) {
-        // 10-second cooldown between deliver actions
-        if (action === "deliver") {
-            const now = Date.now();
-            const elapsed = now - this._lastDeliverAt;
-            if (elapsed < this.DELIVER_COOLDOWN_MS) {
-                const secs = Math.ceil((this.DELIVER_COOLDOWN_MS - elapsed) / 1000);
-                App.showToast(`Please wait ${secs}s before delivering again`);
-                return;
-            }
-            this._lastDeliverAt = now;
-        }
         const state  = mode === "booth" ? this.boothMode : mode === "ward" ? this.wardMode : this.adminMode;
         const scheme = state.scheme;
         const def    = this._def(scheme.id);
@@ -953,8 +992,16 @@ const Scheme = {
         sel.addEventListener("change", () => onChange(sel.value));
     },
 
-    _resetTabUI(viewSel, familyPanelId, otherPanelId) {
-        document.querySelectorAll(`${viewSel} .tab[data-scheme-tab]`).forEach(t => {
+    _resetTabUI(viewSel, familyPanelId, otherPanelId, schemeId) {
+        const tabs = document.querySelectorAll(`${viewSel} .tab[data-scheme-tab]`);
+        const tabsContainer = tabs[0]?.parentElement;
+        if (schemeId === "notice") {
+            // Hide tabs for notice — everything in one flat list
+            if (tabsContainer) tabsContainer.style.display = "none";
+        } else {
+            if (tabsContainer) tabsContainer.style.display = "";
+        }
+        tabs.forEach(t => {
             t.classList.toggle("active", t.dataset.schemeTab === "family");
         });
         document.getElementById(familyPanelId).style.display = "block";
@@ -1003,7 +1050,7 @@ const Scheme = {
         const area  = document.getElementById(areaId);
         const nav   = document.getElementById(navId);
         const empty = document.getElementById(emptyId);
-        const ps    = this.PAGE_SIZE;
+        const ps    = state.scheme?.id === "notice" ? 50 : this.PAGE_SIZE;
         const total = state.families.length;
 
         if (total === 0) {
@@ -1323,7 +1370,7 @@ const Scheme = {
         if (searchEl) { searchEl.value = ""; searchEl.placeholder = "Enter SL number..."; }
         const adminST = document.getElementById("admin-scheme-search-type");
         if (adminST) adminST.value = "sl";
-        this._resetTabUI("#view-admin-scheme", "admin-scheme-family-panel", "admin-scheme-other-panel");
+        this._resetTabUI("#view-admin-scheme", "admin-scheme-family-panel", "admin-scheme-other-panel", state.scheme.id);
 
         const def = this._def(state.scheme.id);
         App.showViewLoading("view-admin-scheme");
