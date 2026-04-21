@@ -588,19 +588,28 @@ const Scheme = {
             : "";
 
         const house = m.house || fam.house || "";
+        const party = m.party_support || "";
+        const metaParts = [];
+        if (house) metaParts.push(`<span class="scheme-flat-meta-tag">H: ${this._esc(house)}</span>`);
+        if (party) metaParts.push(`<span class="scheme-flat-meta-tag">${this._esc(party)}</span>`);
 
-        return `<div class="scheme-flat-row ${isDelivered ? "ncc-delivered" : ""}${m._pending ? " ncc-pending-sync" : ""}" data-famcode="${this._esc(fam.famcode)}">
-            <span class="scheme-flat-sl"><span class="scheme-flat-tag">SL</span> ${m.sl ? this._hl(m.sl, q) : "-"}</span>
-            <span class="scheme-flat-name">${house ? `<span class="scheme-flat-house"><span class="scheme-flat-tag">House</span> ${this._esc(house)}</span> ` : ""}${this._hl(dispName, q)}</span>
-            ${callBtn}
-            <label class="notice-toggle">
-                <input type="checkbox" class="scheme-member-toggle"
-                    data-voter-id="${m.voter_id}"
-                    data-famcode="${this._esc(fam.famcode)}"
-                    data-booth="${this._esc(m.booth || "")}"
-                    ${isDelivered ? "checked" : ""}>
-                <span class="notice-toggle-label">${m._pending ? "&#x27F3;" : isDelivered ? "&#x2713; " + I18n.t("done_label") : "&#x25CF; " + I18n.t("pending")}</span>
-            </label>
+        return `<div class="scheme-flat-row scheme-flat-row-2line ${isDelivered ? "ncc-delivered" : ""}${m._pending ? " ncc-pending-sync" : ""}" data-famcode="${this._esc(fam.famcode)}">
+            <div class="scheme-flat-line1">
+                ${callBtn}
+                <span class="scheme-flat-sl">${m.sl ? this._hl(m.sl, q) : "-"}</span>
+                <span class="scheme-flat-name">${this._hl(dispName, q)}</span>
+            </div>
+            <div class="scheme-flat-line2">
+                <div class="scheme-flat-meta">${metaParts.join("")}</div>
+                <label class="notice-toggle">
+                    <input type="checkbox" class="scheme-member-toggle"
+                        data-voter-id="${m.voter_id}"
+                        data-famcode="${this._esc(fam.famcode)}"
+                        data-booth="${this._esc(m.booth || "")}"
+                        ${isDelivered ? "checked" : ""}>
+                    <span class="notice-toggle-label">${m._pending ? "&#x27F3;" : isDelivered ? "&#x2713; " + I18n.t("done_label") : "&#x25CF; " + I18n.t("pending")}</span>
+                </label>
+            </div>
         </div>`;
     },
 

@@ -588,15 +588,24 @@ const Notice = {
             : "";
 
         const house = m.house || fam.house || "";
+        const party = m.party_support || "";
+        const metaParts = [];
+        if (house) metaParts.push(`<span class="scheme-flat-meta-tag">H: ${this.escapeHtml(house)}</span>`);
+        if (party) metaParts.push(`<span class="scheme-flat-meta-tag">${this.escapeHtml(party)}</span>`);
 
-        return `<div class="scheme-flat-row ${isDelivered ? "ncc-delivered" : ""}${m._pending ? " ncc-pending-sync" : ""}">
-            <span class="scheme-flat-sl"><span class="scheme-flat-tag">SL</span> ${m.sl ? this._hl(m.sl, query) : "-"}</span>
-            <span class="scheme-flat-name">${house ? `<span class="scheme-flat-house"><span class="scheme-flat-tag">House</span> ${this.escapeHtml(house)}</span> ` : ""}${this._hl(name, query)}</span>
-            ${callBtn}
-            <label class="notice-toggle ncc-toggle" onclick="event.stopPropagation()">
-                <input type="checkbox" data-voter-id="${m.voter_id}" ${isDelivered ? "checked" : ""}/>
-                <span class="notice-toggle-label">${m._pending ? "&#x27F3;" : isDelivered ? "&#x2713; " + I18n.t("done_label") : "&#x25CF; " + I18n.t("pending")}</span>
-            </label>
+        return `<div class="scheme-flat-row scheme-flat-row-2line ${isDelivered ? "ncc-delivered" : ""}${m._pending ? " ncc-pending-sync" : ""}">
+            <div class="scheme-flat-line1">
+                ${callBtn}
+                <span class="scheme-flat-sl">${m.sl ? this._hl(m.sl, query) : "-"}</span>
+                <span class="scheme-flat-name">${this._hl(name, query)}</span>
+            </div>
+            <div class="scheme-flat-line2">
+                <div class="scheme-flat-meta">${metaParts.join("")}</div>
+                <label class="notice-toggle ncc-toggle" onclick="event.stopPropagation()">
+                    <input type="checkbox" data-voter-id="${m.voter_id}" ${isDelivered ? "checked" : ""}/>
+                    <span class="notice-toggle-label">${m._pending ? "&#x27F3;" : isDelivered ? "&#x2713; " + I18n.t("done_label") : "&#x25CF; " + I18n.t("pending")}</span>
+                </label>
+            </div>
         </div>`;
     },
 

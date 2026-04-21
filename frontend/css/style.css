@@ -1520,6 +1520,43 @@ body {
     transition: background 0.2s;
 }
 
+.scheme-flat-row.scheme-flat-row-2line {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+}
+
+.scheme-flat-line1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.scheme-flat-line2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 80px;
+}
+
+.scheme-flat-meta {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+}
+
+.scheme-flat-meta-tag {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--bg-hover, rgba(0,0,0,0.04));
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
 .scheme-flat-row.ncc-delivered {
     background: var(--success-light);
 }
@@ -1528,16 +1565,8 @@ body {
     font-size: 0.85rem;
     font-weight: 700;
     color: var(--accent);
-    min-width: 50px;
+    min-width: 36px;
     text-align: right;
-}
-
-.scheme-flat-tag {
-    font-size: 0.6rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
 }
 
 .scheme-flat-name {
@@ -1545,30 +1574,11 @@ body {
     font-size: 0.9rem;
     font-weight: 500;
     color: var(--text-primary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.scheme-flat-house {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--accent);
-    background: var(--accent-light, rgba(79, 140, 255, 0.1));
-    padding: 1px 5px;
-    border-radius: 4px;
-    margin-right: 4px;
-    white-space: nowrap;
 }
 
 .scheme-flat-row.ncc-delivered .scheme-flat-name {
     text-decoration: line-through;
     color: var(--text-muted);
-}
-
-.scheme-flat-row.ncc-delivered .scheme-flat-house {
-    text-decoration: none;
-    opacity: 0.5;
 }
 
 .notice-call-btn {
@@ -3497,6 +3507,8 @@ body {
     border-radius: 12px;
     font-size: 0.7rem;
     font-weight: 600;
+    min-width: 60px;
+    text-align: center;
     background: var(--border-light);
     color: var(--text-muted);
     cursor: pointer;
