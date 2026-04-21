@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import re
 import structlog
 import openpyxl
 from collections import defaultdict
@@ -161,13 +162,23 @@ def _rebuild_booth_meta_from_xlsx() -> None:
     """Read Voter.xlsx to populate booth metadata (name, number, Tamil) in Settings.
 
     Called once on first restart after this feature was added.
+
+    The xlsx BOOTH column is the source of truth for booth names.
+    However, actual partition keys come from the seg CSV and may use different
+    booth numbers for some voters. We build a booth_number -> {name, name_tamil}
+    lookup from the xlsx, then apply it to all partition keys (from seg) so that
+    every booth gets the correct name even when seg and xlsx disagree on booth
+    assignments for individual voters.
     """
     path = settings.VOTER_DATA_FILE_PATH
     if not os.path.exists(path):
         logger.warning("voter_data_file_not_found_for_booth_meta", path=path)
         return
 
+    # Step 1: Build booth_number -> {name, name_tamil} lookup from xlsx
+    booth_name_lookup: dict = {}  # "15" -> {"name": "...", "name_tamil": "..."}
     booth_meta: dict = {}
+
     wb = openpyxl.load_workbook(path, read_only=True)
     ws = wb.active
     headers = [str(c.value or "").strip() for c in next(ws.iter_rows(min_row=1, max_row=1))]
@@ -178,19 +189,48 @@ def _rebuild_booth_meta_from_xlsx() -> None:
         booth_num_raw = str(row[col.get("BOOTH", 4)] or "").strip()
         if not ac_name or not booth_num_raw:
             continue
-        # Generate "Booth # {number}" format to match existing partition keys
-        booth_raw = f"Booth # {int(float(booth_num_raw))}" if booth_num_raw.replace(".", "").isdigit() else f"Booth # {booth_num_raw}"
+        try:
+            bnum = str(int(float(booth_num_raw)))
+        except (ValueError, TypeError):
+            bnum = booth_num_raw
+        booth_name = str(row[col.get("BOOTH NAME", 17)] or "").strip()
+        booth_name_ta = str(row[col.get("BOOTH NAME - Tamil", 18)] or "").strip()
+
+        # Store in lookup (first occurrence wins)
+        if bnum and bnum not in booth_name_lookup and (booth_name or booth_name_ta):
+            booth_name_lookup[bnum] = {"name": booth_name, "name_tamil": booth_name_ta}
+
+        # Also build direct meta for xlsx booth keys
+        booth_raw = f"Booth # {bnum}" if bnum else f"Booth # {booth_num_raw}"
         ward_raw = ac_name
         if not storage.normalize_key(ward_raw) or not storage.normalize_key(booth_raw):
             continue
         key = (ward_raw, booth_raw)
         if key not in booth_meta:
             booth_meta[key] = {
-                "booth_number": booth_num_raw,
-                "booth_name": str(row[col.get("BOOTH NAME", 17)] or "").strip(),
-                "booth_name_tamil": str(row[col.get("BOOTH NAME - Tamil", 18)] or "").strip(),
+                "booth_number": bnum,
+                "booth_name": booth_name,
+                "booth_name_tamil": booth_name_ta,
             }
     wb.close()
+
+    # Step 2: Check all actual partition keys (from seg) and fill in any
+    # that don't match an xlsx booth number, using the lookup
+    all_wards = storage.get_all_wards()
+    for ward in all_wards:
+        booths = storage.get_booths_for_ward(ward)
+        for booth_raw in booths:
+            key = (ward, booth_raw)
+            if key not in booth_meta:
+                # Extract number from partition key (e.g. "Booth # 017" -> "17")
+                bnum_match = re.search(r"(\d+)", booth_raw)
+                bnum = str(int(bnum_match.group(1))) if bnum_match else ""
+                xlsx_info = booth_name_lookup.get(bnum, {})
+                booth_meta[key] = {
+                    "booth_number": bnum,
+                    "booth_name": xlsx_info.get("name", ""),
+                    "booth_name_tamil": xlsx_info.get("name_tamil", ""),
+                }
 
     for (ward_raw, booth_raw), meta in booth_meta.items():
         storage.store_booth_meta(
@@ -273,6 +313,9 @@ def sync_voter_data_once() -> dict:
     errors  = 0
     batch   = []
     seen_epics: set = set()  # deduplicate — xlsx may have duplicate EPICs
+    # Booth name lookup from xlsx: booth_number → {name, name_tamil}
+    # Used later to attach correct booth names to partitions (seg booth may differ from xlsx booth)
+    xlsx_booth_names: dict = {}
     skip_reasons = {"no_epic": 0, "in_seg": 0, "booth_fallback": 0,
                     "no_booth_match": 0, "duplicate": 0, "deleted": 0, "row_error": 0}
 
@@ -332,6 +375,8 @@ def sync_voter_data_once() -> dict:
             booth_display    = f"Booth # {booth_number}"
             booth_name       = str(row_tuple[col.get("BOOTH NAME", 17)] or "").strip()
             booth_name_ta    = str(row_tuple[col.get("BOOTH NAME - Tamil", 18)] or "").strip()
+            if booth_number and booth_number not in xlsx_booth_names and (booth_name or booth_name_ta):
+                xlsx_booth_names[booth_number] = {"name": booth_name, "name_tamil": booth_name_ta}
             section_num      = str(row_tuple[col.get("SECTION", 1)] or "").strip()
             section_name     = str(row_tuple[col.get("SECTION_NAME", 2)] or "").strip()
             # Tamil section name -- strip "{number}::" prefix, skip bad values
@@ -478,12 +523,22 @@ def sync_voter_data_once() -> dict:
                 seg_counts[pk] = seg_counts.get(pk, 0) + 1
             booths_per_ward[ward_raw].add(booth_raw)
             key = (ward_raw, booth_raw)
-            if key not in booth_meta and (v.get("booth_name") or v.get("booth_number")):
-                booth_meta[key] = {
-                    "booth_number":      v.get("booth_number", ""),
-                    "booth_name":        v.get("booth_name", ""),
-                    "booth_name_tamil":  v.get("booth_name_tamil", ""),
-                }
+            if key not in booth_meta:
+                # Extract booth number from the partition key (e.g. "Booth # 017" -> "17")
+                # and look up the correct name from the xlsx booth name lookup.
+                # This avoids mismatches when seg CSV assigns a voter to a different
+                # booth than the xlsx — the xlsx is the source of truth for booth names.
+                bnum_match = re.search(r"(\d+)", booth_raw)
+                bnum = str(int(bnum_match.group(1))) if bnum_match else ""
+                xlsx_info = xlsx_booth_names.get(bnum, {})
+                meta_name = xlsx_info.get("name", "") or v.get("booth_name", "")
+                meta_name_ta = xlsx_info.get("name_tamil", "") or v.get("booth_name_tamil", "")
+                if bnum or meta_name:
+                    booth_meta[key] = {
+                        "booth_number":      bnum,
+                        "booth_name":        meta_name,
+                        "booth_name_tamil":  meta_name_ta,
+                    }
 
     wards_list  = sorted(booths_per_ward.keys())
     booths_dict = {w: sorted(list(b)) for w, b in booths_per_ward.items()}

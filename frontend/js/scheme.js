@@ -125,10 +125,13 @@ const Scheme = {
 
     _parse(schemeId, res) {
         if (schemeId === "notice") {
-            // Flatten all members into individual entries sorted by SL
+            // Flatten all members into individual entries sorted by SL (deduplicated)
             const allMembers = [];
+            const seen = new Set();
             (res.families || []).forEach(fam => {
                 (fam.members || []).forEach(m => {
+                    if (seen.has(m.voter_id)) return;
+                    seen.add(m.voter_id);
                     allMembers.push({
                         famcode: m.voter_id,
                         house: fam.house,
@@ -142,6 +145,8 @@ const Scheme = {
                 });
             });
             (res.ungrouped || []).forEach(m => {
+                if (seen.has(m.voter_id)) return;
+                seen.add(m.voter_id);
                 allMembers.push({
                     famcode: m.voter_id,
                     house: m.house,
@@ -577,10 +582,17 @@ const Scheme = {
             ? (m.name_ta || m.name_seg || m.name_en || m.name || "")
             : (m.name_seg || m.name_en || m.name || m.name_ta || "");
         const q = query || "";
+        const phone = m.phone || "";
+        const callBtn = phone
+            ? `<a href="tel:${this._esc(phone)}" class="notice-call-btn" onclick="event.stopPropagation()" title="${this._esc(phone)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>`
+            : "";
+
+        const house = m.house || fam.house || "";
 
         return `<div class="scheme-flat-row ${isDelivered ? "ncc-delivered" : ""}${m._pending ? " ncc-pending-sync" : ""}" data-famcode="${this._esc(fam.famcode)}">
-            <span class="scheme-flat-sl">${m.sl ? this._hl(m.sl, q) : "-"}</span>
-            <span class="scheme-flat-name">${this._hl(dispName, q)}</span>
+            <span class="scheme-flat-sl"><span class="scheme-flat-tag">SL</span> ${m.sl ? this._hl(m.sl, q) : "-"}</span>
+            <span class="scheme-flat-name">${house ? `<span class="scheme-flat-house"><span class="scheme-flat-tag">House</span> ${this._esc(house)}</span> ` : ""}${this._hl(dispName, q)}</span>
+            ${callBtn}
             <label class="notice-toggle">
                 <input type="checkbox" class="scheme-member-toggle"
                     data-voter-id="${m.voter_id}"

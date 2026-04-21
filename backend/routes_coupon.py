@@ -47,6 +47,17 @@ def _get_phone_last4(voter: dict) -> str:
     return ""
 
 
+def _get_phone_full(voter: dict) -> str:
+    """Decrypt the first available phone field and return the full number."""
+    for field in ("phone_sr_enc", "phone_enc", "whatsapp_enc", "phone3_enc"):
+        enc = voter.get(field, "")
+        if enc:
+            phone = storage.decrypt_phone(enc)
+            if phone and len(phone) >= 4:
+                return phone
+    return ""
+
+
 def sanitize_coupon_voter(voter: dict) -> dict:
     return {
         "voter_id":         voter.get("RowKey", ""),
@@ -67,6 +78,7 @@ def sanitize_coupon_voter(voter: dict) -> dict:
         "sl":               voter.get("sl", ""),
         "booth":            voter.get("booth", ""),
         "phone_last4":      _get_phone_last4(voter),
+        "phone":            _get_phone_full(voter),
         "party_support":    voter.get("party_support", ""),
     }
 

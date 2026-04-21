@@ -1528,8 +1528,16 @@ body {
     font-size: 0.85rem;
     font-weight: 700;
     color: var(--accent);
-    min-width: 36px;
+    min-width: 50px;
     text-align: right;
+}
+
+.scheme-flat-tag {
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .scheme-flat-name {
@@ -1542,9 +1550,48 @@ body {
     white-space: nowrap;
 }
 
+.scheme-flat-house {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-light, rgba(79, 140, 255, 0.1));
+    padding: 1px 5px;
+    border-radius: 4px;
+    margin-right: 4px;
+    white-space: nowrap;
+}
+
 .scheme-flat-row.ncc-delivered .scheme-flat-name {
     text-decoration: line-through;
     color: var(--text-muted);
+}
+
+.scheme-flat-row.ncc-delivered .scheme-flat-house {
+    text-decoration: none;
+    opacity: 0.5;
+}
+
+.notice-call-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    flex-shrink: 0;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.15s;
+}
+
+.notice-call-btn:hover {
+    background: var(--accent-hover, #3a6fd8);
+    transform: scale(1.1);
+}
+
+.notice-call-btn:active {
+    transform: scale(0.95);
 }
 
 .scheme-flat-row .notice-toggle {

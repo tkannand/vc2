@@ -86,10 +86,13 @@ const Notice = {
         App.hideViewLoading("view-booth-notice");
         if (res.error) { App.showToast(res.detail || "Failed to load"); return; }
 
-        // Flatten all members into individual entries sorted by SL
+        // Flatten all members into individual entries sorted by SL (deduplicated)
         const flat = [];
+        const seen = new Set();
         (res.families || []).forEach(fam => {
             (fam.members || []).forEach(m => {
+                if (seen.has(m.voter_id)) return;
+                seen.add(m.voter_id);
                 flat.push({
                     famcode: m.voter_id, members: [m],
                     house: fam.house, section: m.section || fam.section || "",
@@ -99,6 +102,8 @@ const Notice = {
             });
         });
         (res.ungrouped || []).forEach(m => {
+            if (seen.has(m.voter_id)) return;
+            seen.add(m.voter_id);
             flat.push({
                 famcode: m.voter_id, members: [m],
                 house: m.house, section: m.section || "",
@@ -388,10 +393,13 @@ const Notice = {
         App.hideViewLoading("view-ward-notice");
         if (res.error) return;
 
-        // Flatten all members into individual entries sorted by SL
+        // Flatten all members into individual entries sorted by SL (deduplicated)
         const flat = [];
+        const seen = new Set();
         (res.families || []).forEach(fam => {
             (fam.members || []).forEach(m => {
+                if (seen.has(m.voter_id)) return;
+                seen.add(m.voter_id);
                 flat.push({
                     famcode: m.voter_id, members: [m],
                     house: fam.house, section: m.section || fam.section || "",
@@ -401,6 +409,8 @@ const Notice = {
             });
         });
         (res.ungrouped || []).forEach(m => {
+            if (seen.has(m.voter_id)) return;
+            seen.add(m.voter_id);
             flat.push({
                 famcode: m.voter_id, members: [m],
                 house: m.house, section: m.section || "",
@@ -572,10 +582,17 @@ const Notice = {
         const isTamil = I18n.currentLang === "ta";
         const name = isTamil ? (m.name_ta || m.name_en || m.name || "") : (m.name_en || m.name || "");
         const isDelivered = m.status === "delivered";
+        const phone = m.phone || "";
+        const callBtn = phone
+            ? `<a href="tel:${this.escapeHtml(phone)}" class="notice-call-btn" onclick="event.stopPropagation()" title="${this.escapeHtml(phone)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>`
+            : "";
+
+        const house = m.house || fam.house || "";
 
         return `<div class="scheme-flat-row ${isDelivered ? "ncc-delivered" : ""}${m._pending ? " ncc-pending-sync" : ""}">
-            <span class="scheme-flat-sl">${m.sl ? this._hl(m.sl, query) : "-"}</span>
-            <span class="scheme-flat-name">${this._hl(name, query)}</span>
+            <span class="scheme-flat-sl"><span class="scheme-flat-tag">SL</span> ${m.sl ? this._hl(m.sl, query) : "-"}</span>
+            <span class="scheme-flat-name">${house ? `<span class="scheme-flat-house"><span class="scheme-flat-tag">House</span> ${this.escapeHtml(house)}</span> ` : ""}${this._hl(name, query)}</span>
+            ${callBtn}
             <label class="notice-toggle ncc-toggle" onclick="event.stopPropagation()">
                 <input type="checkbox" data-voter-id="${m.voter_id}" ${isDelivered ? "checked" : ""}/>
                 <span class="notice-toggle-label">${m._pending ? "&#x27F3;" : isDelivered ? "&#x2713; " + I18n.t("done_label") : "&#x25CF; " + I18n.t("pending")}</span>
