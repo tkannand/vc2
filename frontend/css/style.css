@@ -1604,6 +1604,13 @@ body {
     transform: scale(0.95);
 }
 
+.notice-call-btn-placeholder {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}
+
 .scheme-flat-row .notice-toggle {
     width: auto;
     height: auto;
